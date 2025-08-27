@@ -2,7 +2,17 @@
 
 ![TexPro AI](frontend/FRAME.png)
 
-A comprehensive full-stack web application for textile manufacturing management, featuring AI-powered quality control, predictive maintenance, and real-time production monitoring.
+**🏭 Smart Textile Manufacturing Management Platform**
+
+A comprehensive full-stack web application for textile manufacturing management, featuring AI-powered quality control, predictive maintenance, and real-time production monitoring. Built with Django REST Framework and Next.js for modern manufacturing operations.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
+[![Django](https://img.shields.io/badge/Django-4.2+-green.svg)](https://djangoproject.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-15+-black.svg)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue.svg)](https://www.typescriptlang.org/)
+
+> **Live Demo**: [https://texpro-ai.herokuapp.com](https://texpro-ai.herokuapp.com) | **Documentation**: [https://docs.texpro-ai.com](https://docs.texpro-ai.com)
 
 ## 🌟 Features
 
