@@ -1,0 +1,182 @@
+[
+{
+  "model": "machines.machinetype",
+  "pk": 59,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.326Z",
+    "updated_at": "2025-08-20T22:49:04.326Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Air Compressor",
+    "description": "Provides compressed air for pneumatic systems",
+    "manufacturer": "Atlas Copco",
+    "typical_power_consumption": 75.0,
+    "typical_production_rate": 1200.0,
+    "production_unit": "CFM",
+    "recommended_maintenance_interval_hours": 1440,
+    "recommended_maintenance_interval_days": 60
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 56,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.289Z",
+    "updated_at": "2025-08-20T22:49:04.289Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Air Jet Loom",
+    "description": "Weaves yarn into fabric using compressed air for weft insertion",
+    "manufacturer": "Picanol",
+    "typical_power_consumption": 12.0,
+    "typical_production_rate": 4.5,
+    "production_unit": "m/min",
+    "recommended_maintenance_interval_hours": 500,
+    "recommended_maintenance_interval_days": 21
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 51,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.236Z",
+    "updated_at": "2025-08-20T22:49:04.236Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Bale Opener",
+    "description": "Opens cotton bales and removes impurities",
+    "manufacturer": "Trützschler",
+    "typical_power_consumption": 60.0,
+    "typical_production_rate": 1000.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 500,
+    "recommended_maintenance_interval_days": 21
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 52,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.246Z",
+    "updated_at": "2025-08-20T22:49:04.247Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Carding Machine",
+    "description": "Combs and aligns cotton fibers into a continuous web",
+    "manufacturer": "Rieter",
+    "typical_power_consumption": 100.0,
+    "typical_production_rate": 200.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 350,
+    "recommended_maintenance_interval_days": 14
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 53,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.258Z",
+    "updated_at": "2025-08-20T22:49:04.258Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Draw Frame",
+    "description": "Combines multiple card slivers and draws them",
+    "manufacturer": "Rieter",
+    "typical_power_consumption": 45.0,
+    "typical_production_rate": 150.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 720,
+    "recommended_maintenance_interval_days": 30
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 60,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.337Z",
+    "updated_at": "2025-08-20T22:49:04.337Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Humidification System",
+    "description": "Controls humidity for optimal cotton processing",
+    "manufacturer": "Munters",
+    "typical_power_consumption": 30.0,
+    "typical_production_rate": 2000.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 720,
+    "recommended_maintenance_interval_days": 30
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 58,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.311Z",
+    "updated_at": "2025-08-20T22:49:04.311Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Jet Dyeing Machine",
+    "description": "Continuous dyeing of fabric using jet technology",
+    "manufacturer": "Thies",
+    "typical_power_consumption": 200.0,
+    "typical_production_rate": 500.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 350,
+    "recommended_maintenance_interval_days": 14
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 57,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.298Z",
+    "updated_at": "2025-08-20T22:49:04.298Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Projectile Loom",
+    "description": "Heavy-duty loom for thick fabrics using projectile system",
+    "manufacturer": "Sulzer",
+    "typical_power_consumption": 18.0,
+    "typical_production_rate": 2.8,
+    "production_unit": "m/min",
+    "recommended_maintenance_interval_hours": 720,
+    "recommended_maintenance_interval_days": 30
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 54,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.269Z",
+    "updated_at": "2025-08-20T22:49:04.269Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Ring Spinning Frame",
+    "description": "Spins cotton roving into yarn using ring and traveler system",
+    "manufacturer": "Rieter",
+    "typical_power_consumption": 150.0,
+    "typical_production_rate": 25.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 720,
+    "recommended_maintenance_interval_days": 30
+  }
+},
+{
+  "model": "machines.machinetype",
+  "pk": 55,
+  "fields": {
+    "created_at": "2025-08-20T22:49:04.280Z",
+    "updated_at": "2025-08-20T22:49:04.280Z",
+    "created_by": null,
+    "updated_by": null,
+    "name": "Rotor Spinning Machine",
+    "description": "Open-end spinning using rotor technology",
+    "manufacturer": "Rieter",
+    "typical_power_consumption": 120.0,
+    "typical_production_rate": 40.0,
+    "production_unit": "kg/hr",
+    "recommended_maintenance_interval_hours": 500,
+    "recommended_maintenance_interval_days": 21
+  }
+}
+]

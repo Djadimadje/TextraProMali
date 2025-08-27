@@ -1,0 +1,46 @@
+# TexPro AI - Production Dependencies
+# Additional packages needed for production deployment
+
+# Production Database
+psycopg2-binary==2.9.10
+
+# Production Server
+gunicorn==23.0.0
+uvicorn==0.32.0
+
+# Static Files & CDN
+whitenoise==6.8.2
+django-storages==1.14.4
+boto3==1.35.60  # For AWS S3 storage
+
+# Caching
+redis==5.1.1
+django-redis==5.4.0
+
+# Monitoring & Error Tracking
+sentry-sdk==2.17.0
+newrelic==10.2.0
+
+# Security Enhancements
+django-secure==1.0.2
+django-csp==3.8
+
+# Performance
+django-cache-machine==1.2.0
+django-extensions==3.2.3
+
+# SSL/HTTPS
+certifi==2024.8.30
+
+# Environment
+python-decouple==3.8
+
+# Backup
+django-dbbackup==4.2.0
+
+# Health Checks
+django-health-check==3.18.3
+
+# Task Queue (Production)
+celery==5.4.0
+flower==2.0.1  # Celery monitoring

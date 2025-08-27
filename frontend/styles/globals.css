@@ -1,0 +1,476 @@
+@import "tailwindcss";
+
+:root {
+  --primary-color: #16a34a;
+  --secondary-color: #6b7280;
+  --success-color: #22c55e;
+  --danger-color: #dc2626;
+  --warning-color: #f59e0b;
+  --info-color: #0ea5e9;
+  --light-color: #f8fafc;
+  --dark-color: #1f2937;
+  --cmdt-green: #16a34a;
+  --cmdt-blue: #1e40af;
+  --cmdt-gold: #f59e0b;
+  --background: #ffffff;
+  --foreground: #171717;
+  
+  /* Additional theme variables */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary-color);
+  --color-cmdt-green: var(--cmdt-green);
+  --color-cmdt-blue: var(--cmdt-blue);
+  --color-cmdt-gold: var(--cmdt-gold);
+}
+
+/* Dark mode variables */
+:root.dark {
+  --primary-color: #4ade80;
+  --secondary-color: #9ca3af;
+  --success-color: #22c55e;
+  --danger-color: #ef4444;
+  --warning-color: #fbbf24;
+  --info-color: #38bdf8;
+  --light-color: #1f2937;
+  --dark-color: #f9fafb;
+  --cmdt-green: #22c55e;
+  --cmdt-blue: #3b82f6;
+  --cmdt-gold: #fbbf24;
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  
+  /* Update theme variables for dark mode */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary-color);
+  --color-cmdt-green: var(--cmdt-green);
+  --color-cmdt-blue: var(--cmdt-blue);
+  --color-cmdt-gold: var(--cmdt-gold);
+}
+
+body {
+  font-family: 'Roboto', 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: var(--dark-color);
+  background: var(--background);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: inherit;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Custom animations for manufacturing/textile theme */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes machineHum {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(1px); }
+  50% { transform: translateX(0); }
+  75% { transform: translateX(-1px); }
+}
+
+@keyframes productionFlow {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes qualityCheck {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+.slide-up {
+  animation: slideUp 0.6s ease-out;
+}
+
+.machine-hum {
+  animation: machineHum 2s infinite ease-in-out;
+}
+
+.production-flow {
+  animation: productionFlow 3s linear infinite;
+}
+
+.quality-check {
+  animation: qualityCheck 1.5s ease-in-out infinite;
+}
+
+/* CMDT/Textile Manufacturing gradient backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, var(--cmdt-green), var(--primary-color));
+}
+
+.bg-gradient-success {
+  background: linear-gradient(135deg, var(--success-color), #15803d);
+}
+
+.bg-gradient-warning {
+  background: linear-gradient(135deg, var(--warning-color), #d97706);
+}
+
+.bg-gradient-textile {
+  background: linear-gradient(135deg, var(--cmdt-green), var(--cmdt-blue), var(--cmdt-gold));
+}
+
+.bg-gradient-manufacturing {
+  background: linear-gradient(45deg, #22c55e, #16a34a, #15803d);
+}
+
+/* Dark mode gradient adjustments */
+.dark .bg-gradient-primary {
+  background: linear-gradient(135deg, var(--cmdt-green), var(--primary-color));
+}
+
+.dark .bg-gradient-success {
+  background: linear-gradient(135deg, var(--success-color), #16a34a);
+}
+
+.dark .bg-gradient-warning {
+  background: linear-gradient(135deg, var(--warning-color), #f59e0b);
+}
+
+.dark .bg-gradient-textile {
+  background: linear-gradient(135deg, var(--cmdt-green), var(--cmdt-blue), var(--cmdt-gold));
+}
+
+/* Textile pattern background */
+.textile-pattern::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60"><path d="M30 30m-2 0a2 2 0 1 1 4 0a2 2 0 1 1-4 0" fill="rgba(22,163,74,0.1)"/><path d="M15 15m-1 0a1 1 0 1 1 2 0a1 1 0 1 1-2 0" fill="rgba(22,163,74,0.05)"/><path d="M45 45m-1 0a1 1 0 1 1 2 0a1 1 0 1 1-2 0" fill="rgba(22,163,74,0.05)"/></svg>') repeat;
+  background-size: 60px 60px;
+}
+
+.dark .textile-pattern::before {
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60"><path d="M30 30m-2 0a2 2 0 1 1 4 0a2 2 0 1 1-4 0" fill="rgba(34,197,94,0.1)"/><path d="M15 15m-1 0a1 1 0 1 1 2 0a1 1 0 1 1-2 0" fill="rgba(34,197,94,0.05)"/><path d="M45 45m-1 0a1 1 0 1 1 2 0a1 1 0 1 1-2 0" fill="rgba(34,197,94,0.05)"/></svg>') repeat;
+  background-size: 60px 60px;
+}
+
+/* Manufacturing dashboard neumorphism */
+.neumorphic {
+  background: #e5e7eb;
+  border-radius: 20px;
+  box-shadow: 12px 12px 24px #c1c5ca, -12px -12px 24px #ffffff;
+}
+
+.neumorphic-inset {
+  background: #e5e7eb;
+  border-radius: 20px;
+  box-shadow: inset 12px 12px 24px #c1c5ca, inset -12px -12px 24px #ffffff;
+}
+
+.neumorphic-button {
+  background: #e5e7eb;
+  border-radius: 15px;
+  box-shadow: 8px 8px 16px #c1c5ca, -8px -8px 16px #ffffff;
+  transition: all 0.3s ease;
+}
+
+.neumorphic-button:active {
+  box-shadow: inset 6px 6px 12px #c1c5ca, inset -6px -6px 12px #ffffff;
+}
+
+/* Dark mode neumorphism */
+.dark .neumorphic {
+  background: #1e293b;
+  box-shadow: 12px 12px 24px #0f172a, -12px -12px 24px #334155;
+}
+
+.dark .neumorphic-inset {
+  background: #1e293b;
+  box-shadow: inset 12px 12px 24px #0f172a, inset -12px -12px 24px #334155;
+}
+
+.dark .neumorphic-button {
+  background: #1e293b;
+  box-shadow: 8px 8px 16px #0f172a, -8px -8px 16px #334155;
+}
+
+.dark .neumorphic-button:active {
+  box-shadow: inset 6px 6px 12px #0f172a, inset -6px -6px 12px #334155;
+}
+
+/* Glass morphism for modern dashboard cards */
+.glass {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+/* Manufacturing card styles */
+.production-card {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(22, 163, 74, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(22, 163, 74, 0.1);
+  transition: all 0.3s ease;
+}
+
+.production-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(22, 163, 74, 0.15);
+}
+
+.dark .production-card {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.dark .production-card:hover {
+  box-shadow: 0 12px 40px rgba(34, 197, 94, 0.2);
+}
+
+/* Input styles for forms */
+.input {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(107, 114, 128, 0.2);
+  color: var(--foreground);
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+}
+
+.dark .input {
+  background: rgba(30, 41, 59, 0.9);
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  color: var(--foreground);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--cmdt-green);
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.1);
+}
+
+/* Button variants for CMDT branding */
+.btn-primary {
+  background: var(--cmdt-green);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  background: #15803d;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(22, 163, 74, 0.3);
+}
+
+.btn-secondary {
+  background: var(--secondary-color);
+  color: white;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.dark .btn-secondary {
+  background: #475569;
+  color: #f1f5f9;
+}
+
+.btn-secondary:hover {
+  background: #4b5563;
+  transform: translateY(-2px);
+}
+
+/* Progress bars for production metrics */
+.progress-bar {
+  background: rgba(22, 163, 74, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 8px;
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, var(--cmdt-green), #22c55e);
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.5s ease;
+}
+
+/* Status indicators */
+.status-online {
+  color: var(--success-color);
+  animation: qualityCheck 2s ease-in-out infinite;
+}
+
+.status-offline {
+  color: var(--danger-color);
+}
+
+.status-maintenance {
+  color: var(--warning-color);
+}
+
+/* Custom scrollbar for textile theme */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-color);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cmdt-green), #15803d);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #15803d, #166534);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cmdt-green), #22c55e);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+}
+
+/* Landing page specific animations */
+.hero-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(22, 163, 74, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(22, 163, 74, 0.8), 0 0 30px rgba(22, 163, 74, 0.4);
+  }
+}
+
+/* Accessibility improvements */
+.focus-ring:focus {
+  outline: 3px solid var(--cmdt-green);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.dark .focus-ring:focus {
+  outline-color: var(--cmdt-green);
+}
+
+/* Theme transition utilities */
+.theme-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Responsive text utilities */
+.text-responsive-sm {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+}
+
+.text-responsive-base {
+  font-size: clamp(1rem, 2.5vw, 1.125rem);
+}
+
+.text-responsive-lg {
+  font-size: clamp(1.125rem, 3vw, 1.25rem);
+}
+
+.text-responsive-xl {
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
+}
+
+.text-responsive-2xl {
+  font-size: clamp(1.5rem, 5vw, 2rem);
+}
+
+.text-responsive-3xl {
+  font-size: clamp(1.875rem, 6vw, 2.5rem);
+}
+
+/* Loading states for manufacturing data */
+.loading-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.dark .loading-shimmer {
+  background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+  background-size: 200% 100%;
+}
+
+/* Print styles for reports */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  
+  .production-card {
+    background: white !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: none !important;
+  }
+}

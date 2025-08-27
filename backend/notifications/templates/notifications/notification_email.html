@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TexPro AI Notification</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 300;
+        }
+        .content {
+            padding: 30px 20px;
+        }
+        .priority {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        .priority.low {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .priority.normal {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .priority.high {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .priority.critical {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .notification-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        .notification-message {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #34495e;
+            margin-bottom: 25px;
+        }
+        .metadata {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .metadata-item {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .metadata-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .footer {
+            background-color: #6c757d;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #adb5bd;
+            text-decoration: none;
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TexPro AI</h1>
+            <p>Textile Manufacturing Optimization System</p>
+        </div>
+        
+        <div class="content">
+            <span class="priority {{ notification.priority }}">{{ notification.get_priority_display }}</span>
+            
+            <h2 class="notification-title">{{ notification.title }}</h2>
+            
+            <div class="notification-message">
+                {{ notification.message|linebreaks }}
+            </div>
+            
+            {% if site_url %}
+            <a href="{{ site_url }}" class="button">View in TexPro AI</a>
+            {% endif %}
+            
+            <div class="metadata">
+                <div class="metadata-item">
+                    <span class="metadata-label">Type:</span> {{ notification.get_type_display }}
+                </div>
+                <div class="metadata-item">
+                    <span class="metadata-label">Time:</span> {{ notification.created_at|date:"F j, Y g:i A" }}
+                </div>
+                {% if notification.sent_by %}
+                <div class="metadata-item">
+                    <span class="metadata-label">Sent by:</span> {{ notification.sent_by.get_full_name|default:notification.sent_by.username }}
+                </div>
+                {% endif %}
+                {% if notification.related_object_type %}
+                <div class="metadata-item">
+                    <span class="metadata-label">Related to:</span> {{ notification.related_object_type|title }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>
+                <strong>TexPro AI</strong> - Textile Manufacturing Optimization<br>
+                CMDT (Compagnie Malienne pour le Développement du Textile)<br>
+                Mali, West Africa
+            </p>
+            {% if site_url %}
+            <p>
+                <a href="{{ site_url }}">Visit TexPro AI Dashboard</a>
+            </p>
+            {% endif %}
+            <p style="font-size: 12px; color: #adb5bd; margin-top: 15px;">
+                This is an automated notification from TexPro AI system. 
+                Please do not reply to this email.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
