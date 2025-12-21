@@ -28,7 +28,9 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ className = '' }) => {
   const { user, logout } = useAuth();
   
   // Get navigation items based on user role (admin in this case)
-  const menuItems = getRoleNavigation('admin');
+  // const menuItems = getRoleNavigation('admin');
+  // Filter out 'settings' and 'notifications' (assuming their keys are 'settings' and 'notifications')
+  const menuItems = getRoleNavigation('admin').filter(item => item.key !== 'settings' && item.key !== 'notifications');
 
   const getIcon = (iconName: string) => {
     const iconMap: Record<string, React.ReactElement> = {

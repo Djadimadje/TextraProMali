@@ -151,6 +151,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
+            # 'username' removed from required input fields, will be auto-generated
             'username', 'email', 'password', 'confirm_password',
             'first_name', 'last_name', 'role', 'status',
             'employee_id', 'phone_number', 'department', 'site_location',
@@ -160,20 +161,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'email': {'required': True},
             'first_name': {'required': True},
             'last_name': {'required': True},
+            'username': {'required': False, 'read_only': True},
         }
     
     def validate_username(self, value):
-        """Validate username"""
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('Username already exists')
-        
-        # Username should be alphanumeric with underscores/hyphens
-        if not value.replace('_', '').replace('-', '').isalnum():
-            raise serializers.ValidationError(
-                'Username can only contain letters, numbers, underscores, and hyphens'
-            )
-        
-        return value.lower()
+        # Allow blank username, will be auto-generated
+        return value
     
     def validate_email(self, value):
         """Validate email"""
@@ -228,6 +221,9 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if not validated_data.get('employee_id'):
             validated_data['employee_id'] = self._generate_employee_id(validated_data.get('role'))
         
+        # Auto-generate username
+        validated_data['username'] = self._generate_username(validated_data)
+        
         # Set created_by to current user
         validated_data['created_by'] = self.context['request'].user
         
@@ -271,6 +267,19 @@ class UserCreateSerializer(serializers.ModelSerializer):
         next_number = max(numbers) + 1 if numbers else 1001
         
         return f"{prefix}{next_number:04d}"
+    
+    def _generate_username(self, validated_data):
+        """Generate a unique username based on first/last name or employee_id"""
+        base = (validated_data.get('first_name', '')[:1] + validated_data.get('last_name', '')).lower()
+        base = ''.join(filter(str.isalnum, base))
+        if not base:
+            base = validated_data.get('employee_id', 'user').lower()
+        username = base
+        counter = 1
+        while User.objects.filter(username=username).exists():
+            username = f"{base}{counter}"
+            counter += 1
+        return username
 
 
 class UserUpdateSerializer(serializers.ModelSerializer):
