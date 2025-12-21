@@ -70,7 +70,7 @@ class WorkforceAllocationSerializer(serializers.ModelSerializer):
             # Role compatibility check
             role_compatibility = {
                 'operator': ['technician', 'operator'],
-                'maintenance': ['technician', 'maintenance'],
+                'maintenance': ['technician', 'maintenance', 'inspector'],
                 'qc': ['inspector', 'qc'],
                 'supervisor': ['supervisor'],
                 'assistant': ['technician', 'assistant']

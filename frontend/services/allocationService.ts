@@ -179,30 +179,44 @@ class AllocationService {
   }
 
   private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
-    try {
-      const data = await response.json();
-      
-      if (!response.ok) {
+    const contentType = response.headers.get('content-type') || '';
+
+    // If the response is JSON, parse and handle normally
+    if (contentType.includes('application/json')) {
+      try {
+        const data = await response.json();
+
+        if (!response.ok) {
+          return {
+            success: false,
+            data: null as any,
+            message: (data && (data.detail || data.message)) || `API request failed (HTTP ${response.status})`,
+            errors: (data && (data.errors || data)) || undefined
+          };
+        }
+
+        return {
+          success: true,
+          data: data,
+          message: data && data.message
+        };
+      } catch (error) {
+        const text = await response.text().catch(() => '<unreadable body>');
         return {
           success: false,
           data: null as any,
-          message: data.detail || data.message || 'API request failed',
-          errors: data.errors || data
+          message: `Failed to parse JSON response: ${error instanceof Error ? error.message : String(error)} - Body: ${text}`
         };
       }
-
-      return {
-        success: true,
-        data: data,
-        message: data.message
-      };
-    } catch (error) {
-      return {
-        success: false,
-        data: null as any,
-        message: error instanceof Error ? error.message : 'Network error'
-      };
     }
+
+    // Non-JSON responses (often HTML error pages) - include body for debugging
+    const text = await response.text().catch(() => '<unreadable body>');
+    return {
+      success: false,
+      data: null as any,
+      message: `Non-JSON response: HTTP ${response.status} ${response.statusText} - ${text}`
+    };
   }
 
   // Workforce Allocation Methods
@@ -234,7 +248,7 @@ class AllocationService {
   }
 
   async getWorkforceAllocation(id: string): Promise<ApiResponse<WorkforceAllocation>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/workforce/${id}/`, {
+    const response = await fetch(`${BASE_URL}/allocation/workforce/${id}/`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
@@ -243,7 +257,7 @@ class AllocationService {
   }
 
   async createWorkforceAllocation(data: WorkforceAllocationCreateData): Promise<ApiResponse<WorkforceAllocation>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/workforce/`, {
+    const response = await fetch(`${BASE_URL}/allocation/workforce/`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
@@ -253,7 +267,7 @@ class AllocationService {
   }
 
   async updateWorkforceAllocation(id: string, data: Partial<WorkforceAllocationCreateData>): Promise<ApiResponse<WorkforceAllocation>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/workforce/${id}/`, {
+    const response = await fetch(`${BASE_URL}/allocation/workforce/${id}/`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
@@ -263,7 +277,7 @@ class AllocationService {
   }
 
   async deleteWorkforceAllocation(id: string): Promise<ApiResponse<void>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/workforce/${id}/`, {
+    const response = await fetch(`${BASE_URL}/allocation/workforce/${id}/`, {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
@@ -272,7 +286,7 @@ class AllocationService {
   }
 
   async checkWorkforceConflicts(id: string): Promise<ApiResponse<ConflictCheckResult>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/workforce/${id}/check_conflicts/`, {
+    const response = await fetch(`${BASE_URL}/allocation/workforce/${id}/check_conflicts/`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
     });
@@ -281,7 +295,7 @@ class AllocationService {
   }
 
   async getWorkforceStats(): Promise<ApiResponse<AllocationStats>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/workforce/statistics/`, {
+    const response = await fetch(`${BASE_URL}/allocation/workforce/statistics/`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
@@ -298,7 +312,7 @@ class AllocationService {
     page?: number;
     page_size?: number;
   }): Promise<ApiResponse<PaginatedResponse<MaterialAllocation>>> {
-    const url = new URL(`${BASE_URL}/api/v1/allocation/materials/`);
+    const url = new URL(`${BASE_URL}/allocation/materials/`);
     
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -317,7 +331,7 @@ class AllocationService {
   }
 
   async getMaterialAllocation(id: string): Promise<ApiResponse<MaterialAllocation>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/materials/${id}/`, {
+    const response = await fetch(`${BASE_URL}/allocation/materials/${id}/`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
@@ -326,7 +340,7 @@ class AllocationService {
   }
 
   async createMaterialAllocation(data: MaterialAllocationCreateData): Promise<ApiResponse<MaterialAllocation>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/materials/`, {
+    const response = await fetch(`${BASE_URL}/allocation/materials/`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
@@ -336,7 +350,7 @@ class AllocationService {
   }
 
   async updateMaterialAllocation(id: string, data: Partial<MaterialAllocationCreateData>): Promise<ApiResponse<MaterialAllocation>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/materials/${id}/`, {
+    const response = await fetch(`${BASE_URL}/allocation/materials/${id}/`, {
       method: 'PUT',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(data),
@@ -346,7 +360,7 @@ class AllocationService {
   }
 
   async deleteMaterialAllocation(id: string): Promise<ApiResponse<void>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/materials/${id}/`, {
+    const response = await fetch(`${BASE_URL}/allocation/materials/${id}/`, {
       method: 'DELETE',
       headers: this.getAuthHeaders(),
     });
@@ -355,7 +369,7 @@ class AllocationService {
   }
 
   async getMaterialStats(): Promise<ApiResponse<MaterialStats>> {
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/materials/statistics/`, {
+    const response = await fetch(`${BASE_URL}/allocation/materials/statistics/`, {
       method: 'GET',
       headers: this.getAuthHeaders(),
     });
@@ -374,13 +388,73 @@ class AllocationService {
       ...params
     };
 
-    const response = await fetch(`${BASE_URL}/api/v1/allocation/reports/batch_report/`, {
+    const response = await fetch(`${BASE_URL}/allocation/reports/batch_report/`, {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify(requestData),
     });
 
     return this.handleResponse<AllocationReport>(response);
+  }
+
+  async exportReport(reportType: string, format: 'excel' | 'pdf', params?: Record<string, any>): Promise<ApiResponse<Blob>> {
+    // Map format to backend route (reports app)
+    const endpoint = `${BASE_URL}/reports/allocation/${format}/`;
+
+    const url = new URL(endpoint);
+    // include basic filter params and reportType
+    if (params) {
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) url.searchParams.append(k, String(v));
+      });
+    }
+    // include a report_type param so server can tailor output if supported
+    url.searchParams.append('report_type', reportType);
+
+    const token = localStorage.getItem('access_token');
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      // Try to parse JSON error body
+      try {
+        const err = await response.json();
+        return {
+          success: false,
+          data: null as any,
+          message: (err && (err.error || err.message)) || `Export failed (HTTP ${response.status})`,
+          errors: err || undefined
+        };
+      } catch (e) {
+        const text = await response.text().catch(() => '<unreadable body>');
+        return {
+          success: false,
+          data: null as any,
+          message: `Export failed (HTTP ${response.status}) - ${text}`
+        };
+      }
+    }
+
+    try {
+      const blob = await response.blob();
+      return {
+        success: true,
+        data: blob,
+        message: 'Export successful'
+      };
+    } catch (e) {
+      const text = await response.text().catch(() => '<unreadable body>');
+      return {
+        success: false,
+        data: null as any,
+        message: `Failed to read export body: ${String(e)} - ${text}`
+      };
+    }
   }
 
   // Utility Methods

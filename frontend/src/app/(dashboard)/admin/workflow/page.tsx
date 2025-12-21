@@ -18,7 +18,7 @@ import {
 import Header from '../../../../../components/layout/Header';
 import AdminSidebar from '../../../../../components/layout/AdminSidebar';
 import { workflowService, BatchWorkflow, BatchWorkflowFilters, BatchWorkflowStats } from '../../../../../services/workflowService';
-import { useAuth } from '../../../../../hooks/useAuth';
+import { useAuth } from '../../../../contexts/AuthContext';
 import { useActivityTracker } from '../../../../hooks/useActivityTracker';
 
 const WorkflowPage: React.FC = () => {
@@ -31,6 +31,12 @@ const WorkflowPage: React.FC = () => {
   console.log('WorkflowPage - User:', user);
   console.log('WorkflowPage - isAuthenticated:', isAuthenticated);
   console.log('WorkflowPage - AuthLoading:', authLoading);
+  const isAuthenticatedRef = React.useRef(isAuthenticated);
+
+  // Keep a ref of the latest auth state to avoid stale closures inside timers
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
   
   const [batches, setBatches] = useState<BatchWorkflow[]>([]);
   const [stats, setStats] = useState<BatchWorkflowStats | null>(null);
@@ -64,24 +70,42 @@ const WorkflowPage: React.FC = () => {
   useEffect(() => {
     console.log('WorkflowPage useEffect triggered');
     console.log('AuthLoading:', authLoading, 'isAuthenticated:', isAuthenticated, 'User:', user);
-    
+    let timerId: number | null = null;
+
     if (!authLoading && isAuthenticated && user) {
       console.log('Conditions met - calling loadBatchWorkflows');
       // Small delay to ensure token is fully available
-      setTimeout(() => {
+      timerId = window.setTimeout(() => {
         loadBatchWorkflows();
         loadStats();
       }, 100);
     } else {
       console.log('Conditions not met - authLoading:', authLoading, 'isAuthenticated:', isAuthenticated, 'user:', user);
-      
-      // If not loading and not authenticated, show error state
+
+      // If not loading and not authenticated, wait briefly before showing an error.
+      // This avoids transient false negatives during navigation when auth state
+      // may still be settling (token rehydration, context update, etc.).
       if (!authLoading && !isAuthenticated) {
-        console.log('Setting authentication error');
-        setLoading(false);
-        setError('Authentication required. Please log in again.');
+        console.log('Auth not authenticated; delaying error to avoid transient false negatives');
+        timerId = window.setTimeout(() => {
+          // Use the ref to get the latest auth state (avoid stale closure)
+          if (!isAuthenticatedRef.current) {
+            setLoading(false);
+            setError('Authentication required. Please log in again.');
+          } else {
+            // If auth recovered while the timer ran, load data
+            loadBatchWorkflows();
+            loadStats();
+          }
+        }, 300);
       }
     }
+
+    return () => {
+      if (timerId) {
+        clearTimeout(timerId);
+      }
+    };
   }, [authLoading, isAuthenticated, user, filters]);
 
   const loadBatchWorkflows = async () => {

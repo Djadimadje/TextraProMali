@@ -67,6 +67,7 @@ const AllocationPage: React.FC = () => {
         console.log('Workforce allocations loaded:', workforceResponse.data.results?.length);
       } else {
         console.error('Workforce allocations failed:', workforceResponse.message);
+        setError(workforceResponse.message || 'Failed to load workforce allocations');
       }
 
       // Load material allocations
@@ -76,6 +77,7 @@ const AllocationPage: React.FC = () => {
         console.log('Material allocations loaded:', materialResponse.data.results?.length);
       } else {
         console.error('Material allocations failed:', materialResponse.message);
+        setError(materialResponse.message || 'Failed to load material allocations');
       }
 
       // Load stats

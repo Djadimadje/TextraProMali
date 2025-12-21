@@ -19,5 +19,6 @@ router.register(r'materials', MaterialAllocationViewSet, basename='material-allo
 router.register(r'reports', AllocationReportViewSet, basename='allocation-reports')
 
 urlpatterns = [
-    path('api/v1/allocation/', include(router.urls)),
+    # Router URLs are included by the project's api/v1/ prefix in core.urls
+    path('', include(router.urls)),
 ]

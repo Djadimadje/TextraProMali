@@ -528,7 +528,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-global-2 mb-1">
-                          {activity.message}
+
                         </p>
                         <div className="flex justify-between items-center">
                           <p className="text-xs text-global-6">
@@ -575,12 +575,12 @@ const AdminDashboard: React.FC = () => {
                   <Button variant="secondary" size="sm" fullWidth>
                     📊 View Reports
                   </Button>
-                  <Button variant="secondary" size="sm" fullWidth>
+                  {/*<Button variant="secondary" size="sm" fullWidth>
                     ⚙️ System Settings
                   </Button>
                   <Button variant="secondary" size="sm" fullWidth>
                     🔄 Backups
-                  </Button>
+                  </Button>*/}
                 </div>
               </Card>
             </div>

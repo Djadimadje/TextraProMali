@@ -7,6 +7,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.http import HttpResponse
+import logging
+import traceback
 
 from reports.permissions import (
     WorkflowReportsPermission, MachineReportsPermission,
@@ -48,6 +50,8 @@ class WorkflowReportPDFView(APIView):
         try:
             return generate_workflow_pdf(request)
         except Exception as e:
+            logging.exception('Workflow PDF generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate workflow PDF report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -66,6 +70,8 @@ class WorkflowReportExcelView(APIView):
         try:
             return generate_workflow_excel(request)
         except Exception as e:
+            logging.exception('Workflow Excel generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate workflow Excel report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -89,6 +95,8 @@ class MachineReportPDFView(APIView):
         try:
             return generate_machine_pdf(request)
         except Exception as e:
+            logging.exception('Machine PDF generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate machine PDF report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -107,6 +115,8 @@ class MachineReportExcelView(APIView):
         try:
             return generate_machine_excel(request)
         except Exception as e:
+            logging.exception('Machine Excel generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate machine Excel report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -133,6 +143,8 @@ class MaintenanceReportPDFView(APIView):
         try:
             return generate_maintenance_pdf(request)
         except Exception as e:
+            logging.exception('Maintenance PDF generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate maintenance PDF report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -151,6 +163,8 @@ class MaintenanceReportExcelView(APIView):
         try:
             return generate_maintenance_excel(request)
         except Exception as e:
+            logging.exception('Maintenance Excel generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate maintenance Excel report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -177,6 +191,8 @@ class QualityReportPDFView(APIView):
         try:
             return generate_quality_pdf(request)
         except Exception as e:
+            logging.exception('Quality PDF generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate quality PDF report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -195,6 +211,8 @@ class QualityReportExcelView(APIView):
         try:
             return generate_quality_excel(request)
         except Exception as e:
+            logging.exception('Quality Excel generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate quality Excel report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -221,6 +239,8 @@ class AllocationReportPDFView(APIView):
         try:
             return generate_allocation_pdf(request)
         except Exception as e:
+            logging.exception('Allocation PDF generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate allocation PDF report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -239,6 +259,8 @@ class AllocationReportExcelView(APIView):
         try:
             return generate_allocation_excel(request)
         except Exception as e:
+            logging.exception('Allocation Excel generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate allocation Excel report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -257,6 +279,8 @@ class AnalyticsReportPDFView(APIView):
         try:
             return generate_analytics_pdf(request)
         except Exception as e:
+            logging.exception('Analytics PDF generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate analytics PDF report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -275,6 +299,8 @@ class AnalyticsReportExcelView(APIView):
         try:
             return generate_analytics_excel(request)
         except Exception as e:
+            logging.exception('Analytics Excel generation failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'error': f'Failed to generate analytics Excel report: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -340,6 +366,8 @@ class ReportsHealthView(APIView):
             }, status=status.HTTP_200_OK)
             
         except Exception as e:
+            logging.exception('Reports health check failed')
+            logging.error(traceback.format_exc())
             return Response({
                 'success': False,
                 'error': f'Health check failed: {str(e)}',

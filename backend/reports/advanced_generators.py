@@ -10,6 +10,8 @@ from .services import (
     create_pdf_base, create_excel_base,
     apply_quality_filters, apply_allocation_filters
 )
+import logging
+import traceback
 
 
 def generate_quality_pdf(request):
@@ -28,15 +30,22 @@ def generate_quality_pdf(request):
         
         # Prepare data
         data = [['Batch', 'Inspector', 'Status', 'Score', 'Check Date', 'Defects']]
-        
+
         for check in queryset[:100]:
+            # Use `created_at` as the check timestamp and `ai_analysis_result`/fields as available
+            check_date = getattr(check, 'created_at', None)
+            defects_field = getattr(check, 'defects', None) or getattr(check, 'ai_analysis_result', None)
+
+            score_val = getattr(check, 'ai_confidence_score', None)
+            defects_val = getattr(check, 'defect_type', None) or ("Defect" if getattr(check, 'defect_detected', False) else 'None')
+
             data.append([
                 str(check.batch) if check.batch else 'N/A',
                 str(check.inspector) if check.inspector else 'N/A',
                 check.get_status_display() if hasattr(check, 'get_status_display') else check.status,
-                f"{check.quality_score:.1f}" if check.quality_score else 'N/A',
-                check.check_date.strftime('%Y-%m-%d') if check.check_date else 'N/A',
-                check.defects[:50] + '...' if check.defects and len(check.defects) > 50 else (check.defects or 'None')
+                (f"{score_val:.2f}" if score_val is not None else 'N/A'),
+                check_date.strftime('%Y-%m-%d') if check_date else 'N/A',
+                (str(defects_val)[:50] + '...') if defects_val and len(str(defects_val)) > 50 else (defects_val or 'None')
             ])
         
         # Create table
@@ -62,6 +71,8 @@ def generate_quality_pdf(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_quality_pdf')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
@@ -85,13 +96,17 @@ def generate_quality_excel(request):
         
         # Data
         for row, check in enumerate(queryset[:1000], 5):
+            check_date = getattr(check, 'created_at', None)
+            score_val = getattr(check, 'ai_confidence_score', None)
+            defects_val = getattr(check, 'defect_type', None) or ("Defect" if getattr(check, 'defect_detected', False) else 'None')
+
             ws.cell(row=row, column=1, value=str(check.batch) if check.batch else 'N/A')
             ws.cell(row=row, column=2, value=str(check.inspector) if check.inspector else 'N/A')
             ws.cell(row=row, column=3, value=check.status or 'N/A')
-            ws.cell(row=row, column=4, value=float(check.quality_score) if check.quality_score else 0)
-            ws.cell(row=row, column=5, value=check.check_date.strftime('%Y-%m-%d') if check.check_date else 'N/A')
-            ws.cell(row=row, column=6, value=check.defects or 'None')
-            ws.cell(row=row, column=7, value=check.notes or 'N/A')
+            ws.cell(row=row, column=4, value=float(score_val) if score_val is not None else 'N/A')
+            ws.cell(row=row, column=5, value=check_date.strftime('%Y-%m-%d') if check_date else 'N/A')
+            ws.cell(row=row, column=6, value=str(defects_val) if defects_val else 'None')
+            ws.cell(row=row, column=7, value=getattr(check, 'comments', None) or 'N/A')
         
         # Save to response
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -100,6 +115,8 @@ def generate_quality_excel(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_quality_excel')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating Excel: {str(e)}", status=500)
 
 
@@ -182,6 +199,8 @@ def generate_allocation_pdf(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_allocation_pdf')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
@@ -247,6 +266,8 @@ def generate_allocation_excel(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_allocation_excel')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating Excel: {str(e)}", status=500)
 
 
@@ -298,6 +319,8 @@ def generate_analytics_pdf(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_analytics_pdf')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
@@ -341,4 +364,6 @@ def generate_analytics_excel(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_analytics_excel')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating Excel: {str(e)}", status=500)

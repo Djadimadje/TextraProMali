@@ -112,12 +112,14 @@ def apply_maintenance_filters(queryset, request):
     filters = parse_date_filters(request)
     
     # Date filters
+    # Map generic start/end filters to model fields: MaintenanceLog uses
+    # `reported_at` (when reported) and `resolved_at` (when completed).
     if 'start_date' in filters:
-        queryset = queryset.filter(start_date__gte=filters['start_date'])
+        queryset = queryset.filter(reported_at__date__gte=filters['start_date'])
     if 'end_date' in filters:
         queryset = queryset.filter(
-            Q(completion_date__lte=filters['end_date']) | 
-            Q(completion_date__isnull=True)
+            Q(resolved_at__date__lte=filters['end_date']) |
+            Q(resolved_at__isnull=True)
         )
     
     # Priority filter
@@ -131,9 +133,12 @@ def apply_maintenance_filters(queryset, request):
         queryset = queryset.filter(status=status)
     
     # Maintenance type filter
-    maintenance_type = request.GET.get('maintenance_type')
-    if maintenance_type:
-        queryset = queryset.filter(maintenance_type=maintenance_type)
+    # Some clients may send `maintenance_type` but the model does not
+    # have a `maintenance_type` field. Ignore this filter to avoid
+    # runtime errors; if you have a specific mapping, update here.
+    # maintenance_type = request.GET.get('maintenance_type')
+    # if maintenance_type:
+    #     queryset = queryset.filter(maintenance_type=maintenance_type)
     
     return queryset
 
@@ -143,10 +148,11 @@ def apply_quality_filters(queryset, request):
     filters = parse_date_filters(request)
     
     # Date filters
+    # Quality checks use `created_at` as the timestamp
     if 'start_date' in filters:
-        queryset = queryset.filter(check_date__gte=filters['start_date'])
+        queryset = queryset.filter(created_at__date__gte=filters['start_date'])
     if 'end_date' in filters:
-        queryset = queryset.filter(check_date__lte=filters['end_date'])
+        queryset = queryset.filter(created_at__date__lte=filters['end_date'])
     
     # Status filter
     status = request.GET.get('status')

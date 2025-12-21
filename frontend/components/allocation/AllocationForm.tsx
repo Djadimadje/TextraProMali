@@ -19,6 +19,7 @@ import {
   MaterialAllocationCreateData,
   ConflictCheckResult
 } from '../../services/allocationService';
+import { BASE_URL } from '../../lib/constants';
 
 interface AllocationFormProps {
   type: 'workforce' | 'material';
@@ -50,6 +51,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<ConflictCheckResult | null>(null);
+  const [dateErrors, setDateErrors] = useState<{ start?: string; end?: string }>({});
 
   // Data options
   const [batches, setBatches] = useState<BatchOption[]>([]);
@@ -75,6 +77,30 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
 
   const roleChoices = allocationService.getWorkforceRoleChoices();
   const unitChoices = allocationService.getMaterialUnitChoices();
+  
+  // Frontend role compatibility mapping (mirror of backend)
+  const roleCompatibility: Record<string, string[]> = {
+    operator: ['technician', 'operator'],
+    maintenance: ['technician', 'maintenance', 'inspector'],
+    qc: ['inspector', 'qc'],
+    supervisor: ['supervisor'],
+    assistant: ['technician', 'assistant']
+  };
+
+  // Filter role choices based on selected user's role (if any)
+  const filteredRoleChoices = React.useMemo(() => {
+    if (!workforceData.user) return roleChoices;
+    const selected = users.find(u => String(u.id) === String(workforceData.user));
+    const userRole = selected?.role || '';
+
+    // Admin can be assigned any role
+    if (userRole === 'admin') return roleChoices;
+
+    return roleChoices.filter(rc => {
+      const compatible = roleCompatibility[rc.value as string] || [];
+      return compatible.includes(userRole as string);
+    });
+  }, [workforceData.user, users, roleChoices]);
 
   useEffect(() => {
     loadFormData();
@@ -83,28 +109,71 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
   const loadFormData = async () => {
     try {
       setLoading(true);
-      
-      // Load batches - assuming we have a workflow service
-      // For now, we'll use mock data since we don't have batch endpoints
-      setBatches([
-        { id: '1', batch_number: 'B-2025-001', product_type: 'Cotton Fabric', current_stage: 'weaving' },
-        { id: '2', batch_number: 'B-2025-002', product_type: 'Polyester Blend', current_stage: 'dyeing' },
-        { id: '3', batch_number: 'B-2025-003', product_type: 'Silk Fabric', current_stage: 'finishing' },
-        { id: '4', batch_number: 'B-2025-004', product_type: 'Denim Fabric', current_stage: 'cutting' },
-        { id: '5', batch_number: 'B-2025-005', product_type: 'Linen Blend', current_stage: 'quality_check' }
-      ]);
+      // Load batches from workflow API so we pass valid PKs (usually UUIDs)
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await fetch(`${BASE_URL}/workflow/batches/?page_size=100`, {
+          method: 'GET',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
 
-      // Load users - in a real app, you'd fetch from a users endpoint
-      setUsers([
-        { id: '1', username: 'john_doe', first_name: 'John', last_name: 'Doe', role: 'operator' },
-        { id: '2', username: 'jane_smith', first_name: 'Jane', last_name: 'Smith', role: 'supervisor' },
-        { id: '3', username: 'mike_wilson', first_name: 'Mike', last_name: 'Wilson', role: 'maintenance' },
-        { id: '4', username: 'sarah_jones', first_name: 'Sarah', last_name: 'Jones', role: 'qc' },
-        { id: '5', username: 'david_brown', first_name: 'David', last_name: 'Brown', role: 'operator' },
-        { id: '6', username: 'lisa_garcia', first_name: 'Lisa', last_name: 'Garcia', role: 'assistant' },
-        { id: '7', username: 'tom_martinez', first_name: 'Tom', last_name: 'Martinez', role: 'supervisor' },
-        { id: '8', username: 'amy_taylor', first_name: 'Amy', last_name: 'Taylor', role: 'qc' }
-      ]);
+        const json = await res.json().catch(() => null);
+        if (json && json.success && json.data && json.data.results) {
+          setBatches(json.data.results.map((b: any) => ({
+            id: b.id,
+            batch_number: b.batch_code,
+            product_type: b.description || '',
+            current_stage: b.status || ''
+          })));
+        } else {
+          // fallback to empty list if API call fails
+          setBatches([]);
+        }
+      } catch (err) {
+        console.warn('Failed to load batches from API, falling back to empty list', err);
+        setBatches([]);
+      }
+
+      // Load users from users API so we send valid PKs to the backend
+      try {
+        const token = localStorage.getItem('access_token');
+        const resUsers = await fetch(`${BASE_URL}/users/?page_size=200`, {
+          method: 'GET',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+
+        const usersJson = await resUsers.json().catch(() => null);
+        if (usersJson && usersJson.success && usersJson.data && usersJson.data.results) {
+          setUsers(usersJson.data.results.map((u: any) => ({
+            id: u.id,
+            username: u.username,
+            first_name: u.first_name || u.username,
+            last_name: u.last_name || '',
+            role: u.role || ''
+          })));
+        } else if (Array.isArray(usersJson)) {
+          // some endpoints may return plain list
+          setUsers(usersJson.map((u: any) => ({
+            id: u.id,
+            username: u.username,
+            first_name: u.first_name || u.username,
+            last_name: u.last_name || '',
+            role: u.role || ''
+          })));
+        } else {
+          // Fallback to small mock list if user API unavailable
+          setUsers([
+            { id: '1', username: 'john_doe', first_name: 'John', last_name: 'Doe', role: 'operator' },
+            { id: '2', username: 'jane_smith', first_name: 'Jane', last_name: 'Smith', role: 'supervisor' }
+          ]);
+        }
+      } catch (err) {
+        console.warn('Failed to load users from API, using fallback mocks', err);
+        setUsers([
+          { id: '1', username: 'john_doe', first_name: 'John', last_name: 'Doe', role: 'operator' },
+          { id: '2', username: 'jane_smith', first_name: 'Jane', last_name: 'Smith', role: 'supervisor' }
+        ]);
+      }
 
     } catch (err) {
       console.error('Failed to load form data:', err);
@@ -117,21 +186,45 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
   const handleWorkforceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Clear previous errors
+    setError(null);
+    setDateErrors({});
+
     if (!workforceData.batch || !workforceData.user) {
       setError('Please select both batch and user');
       return;
     }
+
+    // Client-side date validation and normalization
+    const dateValidation = validateDates(workforceData.start_date, workforceData.end_date);
+    if (!dateValidation.valid) {
+      setDateErrors(dateValidation.errors);
+      // Build a professional, user-friendly error message
+      const msgs = Object.entries(dateValidation.errors).map(([k, v]) => `${k === 'start' ? 'Start date' : 'End date'}: ${v}`);
+      setError(msgs.join(' | '));
+      return;
+    }
+
+    // Normalize dates to YYYY-MM-DD (ensures consistent API payload)
+    if (dateValidation.normalized.start) workforceData.start_date = dateValidation.normalized.start;
+    if (dateValidation.normalized.end) workforceData.end_date = dateValidation.normalized.end;
 
     try {
       setSubmitting(true);
       setError(null);
 
       const response = await allocationService.createWorkforceAllocation(workforceData);
-      
+
       if (response.success) {
         onClose();
       } else {
-        setError(response.message || 'Failed to create workforce allocation');
+        // Show field errors if present
+        if (response.errors) {
+          const formatted = Object.entries(response.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+          setError(formatted);
+        } else {
+          setError(response.message || 'Failed to create workforce allocation');
+        }
       }
     } catch (err) {
       console.error('Error creating workforce allocation:', err);
@@ -140,6 +233,51 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
       setSubmitting(false);
     }
   };
+
+  // Validate date inputs (accept loose input, normalize to YYYY-MM-DD)
+  function validateDates(startRaw?: string, endRaw?: string) {
+    const errors: { start?: string; end?: string } = {};
+    const normalized: { start?: string; end?: string } = {};
+
+    const isoDate = (v: string | undefined) => {
+      if (!v) return undefined;
+      // If already matches YYYY-MM-DD, accept
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+      // Try parsing with Date — if invalid, return undefined
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return undefined;
+      // Convert to local YYYY-MM-DD
+      return d.toISOString().slice(0, 10);
+    };
+
+    if (startRaw) {
+      const s = isoDate(startRaw);
+      if (!s) {
+        errors.start = 'Date has wrong format. Use YYYY-MM-DD (e.g., 2025-12-31).';
+      } else {
+        normalized.start = s;
+      }
+    }
+
+    if (endRaw) {
+      const e = isoDate(endRaw);
+      if (!e) {
+        errors.end = 'Date has wrong format. Use YYYY-MM-DD (e.g., 2025-12-31).';
+      } else {
+        normalized.end = e;
+      }
+    }
+
+    // If both provided and valid, check ordering
+    if (!errors.start && !errors.end && normalized.start && normalized.end) {
+      if (normalized.start > normalized.end) {
+        errors.start = 'Start date cannot be after end date.';
+        errors.end = 'End date cannot be before start date.';
+      }
+    }
+
+    return { valid: Object.keys(errors).length === 0, errors, normalized };
+  }
 
   const handleMaterialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,11 +292,16 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
       setError(null);
 
       const response = await allocationService.createMaterialAllocation(materialData);
-      
+
       if (response.success) {
         onClose();
       } else {
-        setError(response.message || 'Failed to create material allocation');
+        if (response.errors) {
+          const formatted = Object.entries(response.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+          setError(formatted);
+        } else {
+          setError(response.message || 'Failed to create material allocation');
+        }
       }
     } catch (err) {
       console.error('Error creating material allocation:', err);
@@ -221,7 +364,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="">Select role...</option>
-          {roleChoices.map(role => (
+          {filteredRoleChoices.map(role => (
             <option key={role.value} value={role.value}>
               {role.label}
             </option>
@@ -239,8 +382,13 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
             type="date"
             value={workforceData.start_date}
             onChange={(e) => setWorkforceData({ ...workforceData, start_date: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full px-3 py-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${dateErrors.start ? 'border-red-500' : 'border border-gray-300'}`}
+            aria-invalid={!!dateErrors.start}
+            aria-describedby={dateErrors.start ? 'start-date-error' : undefined}
           />
+          {dateErrors.start && (
+            <p id="start-date-error" className="mt-1 text-sm text-red-600">{dateErrors.start}</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -250,8 +398,13 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
             type="date"
             value={workforceData.end_date}
             onChange={(e) => setWorkforceData({ ...workforceData, end_date: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full px-3 py-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${dateErrors.end ? 'border-red-500' : 'border border-gray-300'}`}
+            aria-invalid={!!dateErrors.end}
+            aria-describedby={dateErrors.end ? 'end-date-error' : undefined}
           />
+          {dateErrors.end && (
+            <p id="end-date-error" className="mt-1 text-sm text-red-600">{dateErrors.end}</p>
+          )}
         </div>
       </div>
     </form>
@@ -376,7 +529,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card padding="none" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Card padding="none" className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-lg font-medium text-gray-900 flex items-center">

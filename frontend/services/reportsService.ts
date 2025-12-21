@@ -297,10 +297,25 @@ class ReportsService {
     });
 
     if (!response.ok) {
-      throw new Error(`Export failed: ${response.statusText}`);
+      // Try to get response body for better error details
+      let bodyText: string;
+      try {
+        bodyText = await response.text();
+      } catch (e) {
+        bodyText = '<unable to read response body>';
+      }
+
+      const msg = `Export failed: HTTP ${response.status} ${response.statusText} - ${bodyText}`;
+      console.error('ReportsService.exportSystemReport error response:', msg);
+      throw new Error(msg);
     }
 
-    return response.blob();
+    try {
+      return await response.blob();
+    } catch (err) {
+      console.error('ReportsService.exportSystemReport failed to read blob:', err);
+      throw err;
+    }
   }
 
   // User Reports Methods

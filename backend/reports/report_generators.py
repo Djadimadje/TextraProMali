@@ -4,6 +4,8 @@ PDF and Excel generation for each app module
 """
 
 from django.http import HttpResponse
+import logging
+import traceback
 from reportlab.platypus import Table, TableStyle, Paragraph
 from reportlab.lib import colors
 from .services import (
@@ -63,6 +65,8 @@ def generate_workflow_pdf(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_workflow_pdf')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
@@ -106,6 +110,8 @@ def generate_workflow_excel(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_workflow_excel')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating Excel: {str(e)}", status=500)
 
 
@@ -131,7 +137,8 @@ def generate_machine_pdf(request):
                 machine.name or 'N/A',
                 machine.machine_type or 'N/A',
                 machine.get_status_display() if hasattr(machine, 'get_status_display') else machine.status,
-                machine.location or 'N/A',
+                # Machine model uses `building`, `floor`, and `location_details` instead of `location`
+                " ".join(filter(None, [getattr(machine, 'building', ''), getattr(machine, 'floor', ''), getattr(machine, 'location_details', '')])) or 'N/A',
                 machine.installation_date.strftime('%Y-%m-%d') if hasattr(machine, 'installation_date') and machine.installation_date else 'N/A'
             ])
         
@@ -158,6 +165,8 @@ def generate_machine_pdf(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_machine_pdf')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
@@ -184,7 +193,8 @@ def generate_machine_excel(request):
             ws.cell(row=row, column=1, value=machine.name or 'N/A')
             ws.cell(row=row, column=2, value=machine.machine_type or 'N/A')
             ws.cell(row=row, column=3, value=machine.status or 'N/A')
-            ws.cell(row=row, column=4, value=machine.location or 'N/A')
+            # Combine building/floor/location_details for location display
+            ws.cell(row=row, column=4, value=(" ".join(filter(None, [getattr(machine, 'building', ''), getattr(machine, 'floor', ''), getattr(machine, 'location_details', '')])) or 'N/A'))
             ws.cell(row=row, column=5, value=machine.installation_date.strftime('%Y-%m-%d') if hasattr(machine, 'installation_date') and machine.installation_date else 'N/A')
             ws.cell(row=row, column=6, value=getattr(machine, 'capacity', 'N/A'))
         
@@ -195,6 +205,8 @@ def generate_machine_excel(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_machine_excel')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating Excel: {str(e)}", status=500)
 
 
@@ -218,10 +230,13 @@ def generate_maintenance_pdf(request):
         for log in queryset[:100]:
             data.append([
                 str(log.machine) if log.machine else 'N/A',
-                log.get_maintenance_type_display() if hasattr(log, 'get_maintenance_type_display') else log.maintenance_type,
+                # MaintenanceLog does not have `maintenance_type` field in this project.
+                # Use `priority` as a substitute for the type/importance of the maintenance.
+                (log.get_priority_display() if hasattr(log, 'get_priority_display') else (getattr(log, 'priority', 'N/A'))),
                 log.get_priority_display() if hasattr(log, 'get_priority_display') else log.priority,
                 log.get_status_display() if hasattr(log, 'get_status_display') else log.status,
-                log.start_date.strftime('%Y-%m-%d') if log.start_date else 'N/A',
+                # Use `reported_at` as the start/report date
+                (log.reported_at.strftime('%Y-%m-%d') if getattr(log, 'reported_at', None) else 'N/A'),
                 f"{log.cost:,.0f}" if log.cost else '0'
             ])
         
@@ -248,6 +263,8 @@ def generate_maintenance_pdf(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_maintenance_pdf')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
 
 
@@ -293,4 +310,6 @@ def generate_maintenance_excel(request):
         return response
         
     except Exception as e:
+        logging.exception('Error in generate_maintenance_excel')
+        logging.error(traceback.format_exc())
         return HttpResponse(f"Error generating Excel: {str(e)}", status=500)

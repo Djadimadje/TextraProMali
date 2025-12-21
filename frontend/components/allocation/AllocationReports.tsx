@@ -168,20 +168,30 @@ const AllocationReports: React.FC<AllocationReportsProps> = ({
   const handleExportReport = async (reportType: string, format: 'excel' | 'pdf' = 'excel') => {
     try {
       setExportLoading(true);
-      
-      // In a real implementation, you'd call the backend export API
-      // For now, we'll simulate the export
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Generate filename
+      // Call backend reports exporter
+      const response = await allocationService.exportReport(reportType, format, {
+        start_date: filters.startDate,
+        end_date: filters.endDate
+      });
+
+      if (!response.success) {
+        console.error('Export failed:', response.message);
+        return;
+      }
+
+      const blob = response.data as Blob;
       const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `${reportType}-report-${timestamp}.${format}`;
-      
-      console.log(`Exporting ${reportType} report as ${format}: ${filename}`);
-      
-      // In a real implementation:
-      // const response = await allocationService.exportReport(reportType, format, filters);
-      // downloadFile(response.data, filename);
+      const filename = `${reportType}-report-${timestamp}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+
+      // Trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
       
     } catch (error) {
       console.error('Export failed:', error);
