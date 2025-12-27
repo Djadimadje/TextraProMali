@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar, User, Settings, AlertCircle } from 'lucide-react';
 import Button from '../ui/Button';
 import { maintenanceService } from '../../services/maintenanceApiService';
+import { machineService } from '../../services/machineService';
+import { userService } from '../../services/userService';
 
 interface Machine {
   id: string;
@@ -58,6 +60,8 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     notes: ''
   });
 
+  const [minDateTime, setMinDateTime] = useState<string>('');
+
   useEffect(() => {
     if (isOpen) {
       loadMachines();
@@ -77,22 +81,31 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     }
   }, [isOpen, editTask]);
 
+  useEffect(() => {
+    // Compute local datetime-local min value (YYYY-MM-DDTHH:MM)
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const local = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    setMinDateTime(local);
+  }, []);
+
+  // When modal opens, default next_due_date to minDateTime if empty and not editing
+  useEffect(() => {
+    if (isOpen && !formData.next_due_date && minDateTime) {
+      setFormData(prev => ({ ...prev, next_due_date: minDateTime }));
+    }
+    // only run when modal opens or minDateTime changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, minDateTime]);
+
   const loadMachines = async () => {
     try {
-      // Load machines from API
-      const response = await fetch('/api/v1/machines/', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const machinesList = data.results || data;
-        setMachines(machinesList);
+      const resp = await machineService.getMachines({ ordering: '-created_at', page_size: 200 });
+      if (resp && resp.success) {
+        const machinesList = resp.data.results || [];
+        setMachines(machinesList as Machine[]);
       } else {
-        console.error('Failed to fetch machines');
+        console.error('Failed to fetch machines via machineService', resp?.message || resp);
         setMachines([]);
       }
     } catch (err) {
@@ -103,22 +116,12 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
   const loadTechnicians = async () => {
     try {
-      // Load technicians from users API
-      const response = await fetch('/api/v1/users/?role=technician', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const techniciansList = data.results || data;
-        setTechnicians(techniciansList.filter((user: any) => 
-          user.role === 'technician' || user.role === 'supervisor'
-        ));
+      const resp = await userService.getUsers({ role: 'technician', page_size: 200 });
+      if (resp && resp.success) {
+        const techs = resp.data.results || [];
+        setTechnicians(techs.filter((u: any) => u.role === 'technician' || u.role === 'supervisor'));
       } else {
-        console.error('Failed to fetch technicians');
+        console.error('Failed to fetch technicians via userService', resp?.message || resp);
         setTechnicians([]);
       }
     } catch (err) {
@@ -133,10 +136,42 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
     setError(null);
 
     try {
+      // Client-side validation to avoid backend 400s
+      if (!formData.machine) {
+        setError('Please select a machine');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.technician) {
+        setError('Please assign a technician');
+        setLoading(false);
+        return;
+      }
+
+      const issueText = (formData.issue_reported || '').trim();
+      if (issueText.length < 10) {
+        setError('Issue description must be at least 10 characters');
+        setLoading(false);
+        return;
+      }
+
+      // Ensure we send trimmed issue text
+      const payload = { ...formData, issue_reported: issueText };
+      // Validate schedule date is not in the past
+      if (payload.next_due_date) {
+        const selected = new Date(payload.next_due_date);
+        if (selected < new Date()) {
+          setError('Schedule date cannot be in the past');
+          setLoading(false);
+          return;
+        }
+      }
+
       if (editTask) {
-        await maintenanceService.updateMaintenanceLog(editTask.id, formData);
+        await maintenanceService.updateMaintenanceLog(editTask.id, payload as any);
       } else {
-        await maintenanceService.createMaintenanceLog(formData);
+        await maintenanceService.createMaintenanceLog(payload as any);
       }
       
       onSuccess();
@@ -281,11 +316,27 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               <input
                 type="datetime-local"
                 value={formData.next_due_date}
-                onChange={(e) => setFormData(prev => ({ ...prev, next_due_date: e.target.value }))}
+                min={minDateTime}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    const sel = new Date(val);
+                    const now = new Date();
+                    if (sel < now) {
+                      setError('Schedule date cannot be in the past');
+                      return;
+                    } else {
+                      setError(null);
+                    }
+                  } else {
+                    setError(null);
+                  }
+                  setFormData(prev => ({ ...prev, next_due_date: val }));
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <p className="text-sm text-gray-500 mt-1">
-                Leave empty for immediate scheduling
+                Leave empty for immediate scheduling. You cannot choose a past date.
               </p>
             </div>
           </div>
@@ -303,6 +354,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               placeholder="Describe the maintenance work required, issues reported, or routine maintenance to be performed..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
+            <p className="text-xs text-gray-500 mt-1">Minimum 10 characters. Current: {formData.issue_reported.trim().length}</p>
           </div>
 
           {/* Notes */}

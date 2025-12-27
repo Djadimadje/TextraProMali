@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import Button from '../../../../../../components/ui/Button';
+import { MALI_CONFIG } from '../../../../../../lib/constants';
 import { Machine, MachineType, MachineCreateData, MachineUpdateData } from '../../../../../../services/machineService';
 
 interface User {
@@ -53,6 +54,20 @@ const MachineFormModal: React.FC<MachineFormModalProps> = ({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper to get today's date in yyyy-mm-dd
+  const getToday = () => new Date().toISOString().slice(0, 10);
+  const today = getToday();
+
+  const nextDayString = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + 1);
+      return d.toISOString().slice(0, 10);
+    } catch (e) {
+      return getToday();
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -126,12 +141,23 @@ const MachineFormModal: React.FC<MachineFormModalProps> = ({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'rated_power' || name === 'rated_capacity' 
-        ? (value === '' ? undefined : parseFloat(value))
-        : value
-    }));
+    setFormData(prev => {
+      const next: any = {
+        ...prev,
+        [name]: name === 'rated_power' || name === 'rated_capacity'
+          ? (value === '' ? undefined : parseFloat(value))
+          : value
+      };
+
+      // If installation_date changed and warranty_expiry is empty, set warranty_expiry to installation_date + 1 day
+      if (name === 'installation_date' && value) {
+        if (!prev.warranty_expiry) {
+          next.warranty_expiry = nextDayString(value);
+        }
+      }
+
+      return next;
+    });
     
     // Clear error when user starts typing
     if (errors[name]) {
@@ -167,6 +193,43 @@ const MachineFormModal: React.FC<MachineFormModalProps> = ({
     }
     if (formData.rated_capacity !== undefined && formData.rated_capacity < 0) {
       newErrors.rated_capacity = 'Rated capacity cannot be negative';
+    }
+
+    // Installation date should not be in the past (allow today)
+    if (formData.installation_date) {
+      try {
+        const inst = new Date(formData.installation_date);
+        const minDate = new Date(today);
+        // Normalize to dates only
+        inst.setHours(0,0,0,0);
+        minDate.setHours(0,0,0,0);
+        if (inst < minDate) {
+          newErrors.installation_date = 'Installation date cannot be in the past';
+        }
+      } catch (e) {
+        newErrors.installation_date = 'Invalid installation date';
+      }
+    }
+
+    // If installation date is provided, warranty expiry must be present and at least one day after
+    if (formData.installation_date) {
+      if (!formData.warranty_expiry) {
+        newErrors.warranty_expiry = 'Warranty expiry is required when installation date is set';
+      } else {
+        try {
+          const inst = new Date(formData.installation_date);
+          const warr = new Date(formData.warranty_expiry);
+          inst.setHours(0,0,0,0);
+          warr.setHours(0,0,0,0);
+          // warranty must be at least installation + 1 day
+          inst.setDate(inst.getDate() + 1);
+          if (warr < inst) {
+            newErrors.warranty_expiry = 'Warranty expiry must be at least one day after installation date';
+          }
+        } catch (e) {
+          newErrors.warranty_expiry = 'Invalid warranty expiry date';
+        }
+      }
     }
 
     setErrors(newErrors);
@@ -508,6 +571,7 @@ const MachineFormModal: React.FC<MachineFormModalProps> = ({
                 value={formData.installation_date}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                min={today}
               />
             </div>
 
@@ -521,6 +585,7 @@ const MachineFormModal: React.FC<MachineFormModalProps> = ({
                 value={formData.warranty_expiry}
                 onChange={handleInputChange}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                min={formData.installation_date ? nextDayString(formData.installation_date) : nextDayString(today)}
               />
             </div>
           </div>
@@ -529,7 +594,7 @@ const MachineFormModal: React.FC<MachineFormModalProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Purchase Cost (CFA)
+                Purchase Cost ({MALI_CONFIG.currency_symbol})
               </label>
               <input
                 type="text"

@@ -98,7 +98,7 @@ def maintenance_notification(sender, instance, created, **kwargs):
         NotificationService.create_maintenance_notification(
             maintenance_log=instance,
             event_type='scheduled',
-            user=instance.performed_by
+            user=getattr(instance, 'performed_by', None) or getattr(instance, 'technician', None)
         )
     else:
         # Check for completion
@@ -106,7 +106,7 @@ def maintenance_notification(sender, instance, created, **kwargs):
             NotificationService.create_maintenance_notification(
                 maintenance_log=instance,
                 event_type='completed',
-                user=instance.performed_by
+                user=getattr(instance, 'performed_by', None) or getattr(instance, 'technician', None)
             )
 
 

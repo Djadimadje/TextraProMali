@@ -301,9 +301,10 @@ class NotificationService:
             )
         )
         
-        # Add batch creator
-        if batch.created_by:
-            recipients.add(batch.created_by)
+        # Add batch creator if available (some models may not have this field)
+        creator = getattr(batch, 'created_by', None)
+        if creator:
+            recipients.add(creator)
         
         # Add quality inspectors for quality-related events
         if event_type in ['quality_failed', 'quality_passed']:

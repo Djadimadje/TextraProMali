@@ -76,7 +76,9 @@ const UserTable: React.FC<UserTableProps> = ({ users, onEditUser, onDeleteUser, 
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-gray-900">
-                    {user.supervisor ? (
+                    {((user as any).supervisor_name) ? (
+                      (user as any).supervisor_name
+                    ) : user.supervisor ? (
                       (() => {
                         const supervisor = users.find(u => u.id === user.supervisor);
                         return supervisor 

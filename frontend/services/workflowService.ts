@@ -180,11 +180,28 @@ class WorkflowService {
       body: JSON.stringify(data),
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to create batch workflow: ${response.statusText}`);
+    // Try to parse response body for richer error messages
+    const text = await response.text();
+    let parsed: any = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch (e) {
+      // ignore parse error, will use raw text
     }
 
-    return response.json();
+    if (!response.ok) {
+      const serverMessage = parsed?.message || parsed?.detail || parsed || response.statusText || 'Bad Request';
+      const errors = parsed?.errors || parsed || null;
+      // Throw an Error instance with attached metadata for better debugging/UI handling
+      const err = new Error(typeof serverMessage === 'string' ? serverMessage : JSON.stringify(serverMessage));
+      (err as any).serverMessage = serverMessage;
+      (err as any).errors = errors;
+      (err as any).status = response.status;
+      throw err;
+    }
+
+    // On success, return parsed JSON (or parse from text if needed)
+    return parsed || JSON.parse(text);
   }
 
   /**

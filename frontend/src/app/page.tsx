@@ -1,7 +1,6 @@
 
 'use client';
 import Link from 'next/link'
-import Image from 'next/image'
 
 export default function LandingPage() {
   return (
@@ -30,19 +29,6 @@ export default function LandingPage() {
                     Login to Dashboard
                   </button>
                 </Link>
-                <button 
-                  onClick={() => {
-                    // Clear all auth data
-                    localStorage.removeItem('user');
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('refresh_token');
-                    // Redirect to login with force parameter
-                    window.location.href = '/login?force=true';
-                  }}
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-8 py-4 rounded-lg text-lg font-semibold transition-colors shadow-lg hover:shadow-xl"
-                >
-                  Clear Session & Login
-                </button>
               </div>
             </div>
           </div>

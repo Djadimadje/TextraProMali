@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { qualityService } from '../../services/qualityService';
 import { exportService } from '../../services/exportService';
+import { workflowService } from '../../services/workflowService';
 import ExportButton from '../common/ExportButton';
 import { 
   Upload, 
@@ -43,6 +44,12 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onCheckCompleted }) => {
   const [selectedBatch, setSelectedBatch] = useState('');
   const [checkType, setCheckType] = useState('visual');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [batchOptions, setBatchOptions] = useState<Array<{ id: string; batch_code: string }>>([]);
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied' | 'error'>('unknown');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -92,6 +99,101 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onCheckCompleted }) => {
       uploadImage(image);
     });
   };
+
+  useEffect(() => {
+    // Load recent batches to populate dropdown/autocomplete
+    const loadBatches = async () => {
+      try {
+        const resp = await workflowService.getBatchWorkflows({ page_size: 100, ordering: '-created_at' });
+        const results = (resp as any)?.data?.results ?? (resp as any)?.results ?? [];
+        setBatchOptions(results.map((b: any) => ({ id: b.id, batch_code: b.batch_code })));
+      } catch (err) {
+        console.error('Failed to load batch options for image upload:', err);
+        setBatchOptions([]);
+      }
+    };
+
+    loadBatches();
+  }, []);
+
+  // Camera handling
+  const startCamera = async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Camera not supported in this browser');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      streamRef.current = stream;
+      setCameraPermission('granted');
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+    } catch (err: any) {
+      console.error('Failed to access camera:', err);
+      // Distinguish between denial and other errors
+      if (err && (err.name === 'NotAllowedError' || err.name === 'SecurityError' || err.message?.toLowerCase?.().includes('permission')) ) {
+        setCameraPermission('denied');
+      } else {
+        setCameraPermission('error');
+      }
+    }
+  };
+
+  const stopCamera = () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
+    } catch (err) {
+      console.error('Error stopping camera:', err);
+    }
+    setShowCamera(false);
+    setCameraPermission('unknown');
+  };
+
+  const takePhoto = async () => {
+    if (!videoRef.current) return;
+
+    const video = videoRef.current;
+    const width = video.videoWidth || 1280;
+    const height = video.videoHeight || 720;
+
+    if (!canvasRef.current) canvasRef.current = document.createElement('canvas');
+    const canvas = canvasRef.current;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, width, height);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const fileName = `camera_${Date.now()}.jpg`;
+      const file = new File([blob], fileName, { type: blob.type });
+      // Reuse existing upload flow
+      handleFiles([file]);
+      // close camera after capture
+      stopCamera();
+    }, 'image/jpeg', 0.9);
+  };
+
+  // Start camera when modal is opened
+  useEffect(() => {
+    if (showCamera) startCamera();
+    return () => {
+      // ensure camera stopped when unmounted or modal closed
+      if (showCamera === false) stopCamera();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showCamera]);
 
   const uploadImage = async (image: UploadedImage) => {
     try {
@@ -201,16 +303,19 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onCheckCompleted }) => {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Batch Code
             </label>
-            <input
-              type="text"
+            <select
               value={selectedBatch}
               onChange={(e) => setSelectedBatch(e.target.value)}
-              placeholder="Enter batch code (required)"
               required
               className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 ${
                 !selectedBatch.trim() ? 'border-red-300 bg-red-50' : 'border-gray-300'
               }`}
-            />
+            >
+              <option value="">Select a batch...</option>
+              {batchOptions.map(opt => (
+                <option key={opt.id} value={opt.batch_code}>{opt.batch_code}</option>
+              ))}
+            </select>
           </div>
           
           <div>
@@ -301,10 +406,8 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onCheckCompleted }) => {
                 Choose Files
               </button>
               <button
-                onClick={() => {
-                  // Camera functionality would be implemented here
-                  alert('Camera functionality coming soon!');
-                }}
+                type="button"
+                onClick={() => setShowCamera(true)}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
               >
                 <Camera className="h-4 w-4 mr-2" />
@@ -322,6 +425,58 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onCheckCompleted }) => {
           onChange={handleFileSelect}
           className="hidden"
         />
+      
+        {/* Camera Modal */}
+        {showCamera && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 z-60 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg w-full max-w-3xl p-4">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-lg font-medium">Camera</h3>
+                <div className="space-x-2">
+                  <button onClick={stopCamera} className="px-3 py-1 border rounded-md text-sm">Close</button>
+                  <button onClick={takePhoto} className="px-3 py-1 bg-violet-600 text-white rounded-md text-sm">Capture</button>
+                </div>
+              </div>
+              {/* Camera permission / error banner */}
+              {cameraPermission === 'denied' && (
+                <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex justify-between items-center">
+                  <div>
+                    Camera access denied. Please allow camera access in your browser settings and retry.
+                  </div>
+                  <div className="flex items-center">
+                    <button
+                      onClick={startCamera}
+                      className="inline-flex items-center px-3 py-1 bg-violet-600 text-white rounded-md text-sm mr-2"
+                    >
+                      Retry
+                    </button>
+                    <button onClick={stopCamera} className="px-3 py-1 border rounded-md text-sm">Close</button>
+                  </div>
+                </div>
+              )}
+              {cameraPermission === 'error' && (
+                <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800 flex justify-between items-center">
+                  <div>
+                    Unable to access camera due to an unexpected error. Try again or check your device.
+                  </div>
+                  <div className="flex items-center">
+                    <button
+                      onClick={startCamera}
+                      className="inline-flex items-center px-3 py-1 bg-violet-600 text-white rounded-md text-sm mr-2"
+                    >
+                      Retry
+                    </button>
+                    <button onClick={stopCamera} className="px-3 py-1 border rounded-md text-sm">Close</button>
+                  </div>
+                </div>
+              )}
+              <div className="w-full bg-black rounded-md">
+                <video ref={videoRef} playsInline className="w-full h-[420px] object-cover bg-black" />
+              </div>
+              <canvas ref={canvasRef as any} className="hidden" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Uploaded Images */}

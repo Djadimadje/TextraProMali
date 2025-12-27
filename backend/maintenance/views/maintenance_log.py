@@ -112,6 +112,18 @@ class MaintenanceLogViewSet(viewsets.ModelViewSet):
             serializer.save(technician=self.request.user)
         else:
             serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        """Wrap create to catch unexpected server errors and return JSON with details"""
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            # Log full exception server-side
+            logger.exception('Unhandled exception in MaintenanceLogViewSet.create: %s', e)
+            # Return JSON body with error message to help frontend debugging
+            return Response({'error': str(e) or 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['post'])
     def mark_completed(self, request, pk=None):

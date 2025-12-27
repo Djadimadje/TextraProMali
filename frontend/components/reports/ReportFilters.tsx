@@ -29,6 +29,12 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
   onRefresh,
   loading
 }) => {
+  const todayISO = new Date().toISOString().split('T')[0];
+  // Safely access optional dateRange on filters
+  const dateRange = filters.dateRange || { start: '', end: '', preset: '' };
+  const startVal = dateRange.start || '';
+  const presetVal = dateRange.preset || '';
+  const endMin = (startVal && startVal > todayISO) ? startVal : todayISO;
   const datePresets = [
     { key: '7d', label: 'Last 7 Days' },
     { key: '30d', label: 'Last 30 Days' },
@@ -83,7 +89,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
 
     onFiltersChange({
       dateRange: {
-        ...filters.dateRange,
+        ...dateRange,
         preset: preset as any,
         ...(preset !== 'custom' && {
           start: start.toISOString().split('T')[0],
@@ -93,21 +99,25 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
     });
   };
 
+  // Use safe defaults for arrays which may be undefined
+  const reportTypesCurrent = filters.reportTypes ?? [];
+  const departmentsCurrent = filters.departments ?? [];
+
   const handleReportTypeToggle = (type: string) => {
-    const current = filters.reportTypes;
+    const current = reportTypesCurrent;
     const updated = current.includes(type)
       ? current.filter(t => t !== type)
       : [...current, type];
-    
+
     onFiltersChange({ reportTypes: updated });
   };
 
   const handleDepartmentToggle = (dept: string) => {
-    const current = filters.departments;
+    const current = departmentsCurrent;
     const updated = current.includes(dept)
       ? current.filter(d => d !== dept)
       : [...current, dept];
-    
+
     onFiltersChange({ departments: updated });
   };
 
@@ -174,7 +184,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
                     key={preset.key}
                     onClick={() => handleDatePresetChange(preset.key)}
                     className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      filters.dateRange.preset === preset.key
+                      presetVal === preset.key
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
@@ -184,22 +194,30 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
                 ))}
               </div>
               
-              {filters.dateRange.preset === 'custom' && (
+              {presetVal === 'custom' && (
                 <div className="flex gap-2">
                   <input
                     type="date"
-                    value={filters.dateRange.start}
-                    onChange={(e) => onFiltersChange({
-                      dateRange: { ...filters.dateRange, start: e.target.value }
-                    })}
+                    value={startVal}
+                    min={todayISO}
+                    onChange={(e) => {
+                      const val = e.target.value < todayISO ? todayISO : e.target.value;
+                      onFiltersChange({
+                        dateRange: { ...dateRange, start: val, preset: 'custom' }
+                      });
+                    }}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
                   <input
                     type="date"
-                    value={filters.dateRange.end}
-                    onChange={(e) => onFiltersChange({
-                      dateRange: { ...filters.dateRange, end: e.target.value }
-                    })}
+                    value={dateRange.end || ''}
+                    min={endMin}
+                    onChange={(e) => {
+                      const val = e.target.value < endMin ? endMin : e.target.value;
+                      onFiltersChange({
+                        dateRange: { ...dateRange, end: val, preset: 'custom' }
+                      });
+                    }}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
                 </div>
@@ -220,7 +238,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
                   key={type.key}
                   onClick={() => handleReportTypeToggle(type.key)}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                    filters.reportTypes.includes(type.key)
+                    reportTypesCurrent.includes(type.key)
                       ? 'bg-green-100 text-green-800 border border-green-300'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
@@ -244,7 +262,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
                 onClick={() => onFiltersChange({ departments: [] })}
                 className="text-xs text-blue-600 hover:text-blue-800"
               >
-                {filters.departments.length > 0 ? 'Clear All' : 'Select All'}
+                {departmentsCurrent.length > 0 ? 'Clear All' : 'Select All'}
               </button>
               
               <div className="max-h-32 overflow-y-auto space-y-1">
@@ -252,7 +270,7 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
                   <label key={dept} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={filters.departments.includes(dept)}
+                      checked={departmentsCurrent.includes(dept)}
                       onChange={() => handleDepartmentToggle(dept)}
                       className="rounded border-gray-300"
                     />
@@ -275,8 +293,8 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 block">Shift</label>
                 <select
-                  value={filters.shift}
-                  onChange={(e) => onFiltersChange({ shift: e.target.value as any })}
+                  value={filters.shifts?.[0] ?? 'all'}
+                  onChange={(e) => onFiltersChange({ shifts: [e.target.value] })}
                   className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
                 >
                   <option value="all">All Shifts</option>
@@ -338,30 +356,30 @@ const ReportFilters: React.FC<ReportFiltersProps> = ({
           <div className="flex flex-wrap gap-2">
             <Badge variant="info" size="sm">
               <Calendar size={12} />
-              {filters.dateRange.preset === 'custom' 
-                ? `${filters.dateRange.start} to ${filters.dateRange.end}`
-                : datePresets.find(p => p.key === filters.dateRange.preset)?.label
+              {presetVal === 'custom' 
+                ? `${dateRange.start} to ${dateRange.end}`
+                : datePresets.find(p => p.key === presetVal)?.label
               }
             </Badge>
-            
-            {filters.reportTypes.length > 0 && (
+
+            {reportTypesCurrent.length > 0 && (
               <Badge variant="success" size="sm">
                 <TrendingUp size={12} />
-                {filters.reportTypes.length} Report Types
+                {reportTypesCurrent.length} Report Types
               </Badge>
             )}
-            
-            {filters.departments.length > 0 && (
+
+            {departmentsCurrent.length > 0 && (
               <Badge variant="warning" size="sm">
                 <Building size={12} />
-                {filters.departments.length} Departments
+                {departmentsCurrent.length} Departments
               </Badge>
             )}
             
-            {filters.shift !== 'all' && (
+            {((filters.shifts && filters.shifts[0]) || 'all') !== 'all' && (
               <Badge variant="default" size="sm">
                 <Clock size={12} />
-                {filters.shift} Shift
+                {(filters.shifts && filters.shifts[0]) || 'all'} Shift
               </Badge>
             )}
           </div>

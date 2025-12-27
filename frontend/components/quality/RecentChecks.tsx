@@ -80,10 +80,16 @@ const RecentChecks: React.FC<RecentChecksProps> = ({ checks, loading }) => {
                   }
                 </p>
               </div>
-              <div className="flex-shrink-0">
-                <span className={getSeverityBadge(check.severity)}>
-                  {check.severity}
-                </span>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex-shrink-0">
+                  <span className={getSeverityBadge(check.severity)}>
+                    {check.severity}
+                  </span>
+                </div>
+                <div className="text-right text-sm text-gray-500">
+                  <div>{check.inspector ? `${check.inspector.first_name} ${check.inspector.last_name}` : 'Inspector: N/A'}</div>
+                  <div>AI: {typeof check.ai_confidence_score === 'number' ? `${check.ai_confidence_score}%` : 'N/A'}</div>
+                </div>
               </div>
             </div>
           )) || []}

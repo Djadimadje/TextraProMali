@@ -213,24 +213,33 @@ const ReportsPage: React.FC = () => {
     try {
       setLoading(true);
       
-      const blob = await reportsService.exportSystemReport(reportType, format, {
+      const result = await reportsService.exportSystemReportWithFallback(reportType, format, {
         date_range: selectedDateRange,
         ...filters
       });
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${reportType}_report_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+
+      // If server returned a Blob, trigger download here. If `null`, the
+      // client-side fallback already handled the download.
+      if (result instanceof Blob && result.size > 0) {
+        const url = URL.createObjectURL(result);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${reportType}_report_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
       
     } catch (error) {
       console.error('Export failed:', error);
-      setError(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Surface clearer message for unauthorized errors
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      if (/HTTP 401/.test(msg) || /Unauthorized/.test(msg)) {
+        setError('Unauthorized: you do not have permission to export this report. Please login with an account that has export privileges.');
+      } else {
+        setError(`Export failed: ${msg}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -510,7 +519,7 @@ const ReportsPage: React.FC = () => {
                                 variant="outline"
                                 onClick={() => handleExportSystemReport(key as any, 'pdf')}
                                 className="flex-1"
-                                disabled={loading}
+                                disabled={loading || !dashboardData?.user_permissions?.can_export}
                               >
                                 <Download className="h-4 w-4 mr-1" />
                                 PDF
@@ -522,7 +531,7 @@ const ReportsPage: React.FC = () => {
                                 variant="outline"
                                 onClick={() => handleExportSystemReport(key as any, 'excel')}
                                 className="flex-1"
-                                disabled={loading}
+                                disabled={loading || !dashboardData?.user_permissions?.can_export}
                               >
                                 <Download className="h-4 w-4 mr-1" />
                                 Excel

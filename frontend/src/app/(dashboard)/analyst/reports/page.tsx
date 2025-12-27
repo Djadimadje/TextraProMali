@@ -18,10 +18,20 @@ export interface ReportFilters {
   timeRange: '1d' | '7d' | '30d' | '90d' | 'custom';
   dateFrom?: string;
   dateTo?: string;
+  // Optional normalized dateRange used by some filter components
+  dateRange?: {
+    start?: string;
+    end?: string;
+    preset?: string;
+  };
   machines?: string[];
   departments?: string[];
   shifts?: string[];
+  // Granularity for aggregation
+  granularity?: 'hourly' | 'daily' | 'weekly' | 'monthly';
   metrics?: string[];
+  // Include comparison data (boolean)
+  includeComparisons?: boolean;
   reportTypes?: string[];
   exportFormat?: 'pdf' | 'excel' | 'csv';
 }

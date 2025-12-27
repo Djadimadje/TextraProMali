@@ -139,10 +139,28 @@ class MaintenanceServiceClass {
       }
 
       const data = await response.json();
+      // Normalize various API shapes so callers always get an array in `data`.
+      const resultsArray: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data.results)
+          ? data.results
+          : Array.isArray((data as any).data)
+            ? (data as any).data
+            : [];
+
+      // Debug: if we ended up with no results, log the raw response for inspection.
+      if (!resultsArray || resultsArray.length === 0) {
+        try {
+          console.info('getMaintenanceLogs: normalized to empty array. Raw response:', data);
+        } catch (e) {
+          console.info('getMaintenanceLogs: empty results and failed to stringify raw response');
+        }
+      }
+
       return {
         success: true,
-        data: data.results || data,
-        count: data.count,
+        data: resultsArray,
+        count: data.count ?? resultsArray.length,
         next: data.next,
         previous: data.previous
       };
@@ -184,7 +202,10 @@ class MaintenanceServiceClass {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to create maintenance log: ${response.statusText}`);
+        console.error('Create maintenance log failed. Status:', response.status, 'Body:', errorData);
+        // Include detailed validation errors in thrown Error for better UX in frontend
+        const detailed = typeof errorData === 'object' ? JSON.stringify(errorData) : String(errorData);
+        throw new Error(detailed || `Failed to create maintenance log: ${response.statusText}`);
       }
 
       const responseData = await response.json();

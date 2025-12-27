@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { qualityService, QualityCheck } from '../../services/qualityService';
+import { workflowService } from '../../services/workflowService';
+import BatchAutocomplete from './BatchAutocomplete';
 import { exportService } from '../../services/exportService';
 import ExportButton from '../common/ExportButton';
 import { 
@@ -40,6 +42,8 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
     comments: '',
     image: null as File | null
   });
+  const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
+  const [batchOptions, setBatchOptions] = useState<Array<{ id: string; batch_code: string }>>([]);
 
   // Helper functions to extract values from the service QualityCheck type
   const getBatchCode = (check: QualityCheck): string => {
@@ -73,6 +77,22 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
   useEffect(() => {
     loadQualityChecks();
   }, [filters]);
+
+  useEffect(() => {
+    // Load recent batches to populate dropdown for new checks
+    const loadBatches = async () => {
+      try {
+        const resp = await workflowService.getBatchWorkflows({ page_size: 100, ordering: '-created_at' });
+        const results = (resp as any)?.data?.results ?? (resp as any)?.results ?? [];
+        setBatchOptions(results.map((b: any) => ({ id: b.id, batch_code: b.batch_code })));
+      } catch (err) {
+        console.error('Failed to load batch options for quality checks:', err);
+        setBatchOptions([]);
+      }
+    };
+
+    loadBatches();
+  }, []);
 
   const loadQualityChecks = async () => {
     try {
@@ -148,14 +168,18 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
     }
 
     try {
-      // First, we need to find the batch ID from the batch code
-      // For now, we'll pass the batch_code as-is and let the backend handle it
-      // The backend should ideally accept batch_code and resolve to batch ID
-      
+      // Use selected batch (from autocomplete) if available
+      const resolvedBatchCode = selectedBatch || newCheckForm.batch_code;
+
+      if (!resolvedBatchCode) {
+        alert('Please select a valid batch before creating the quality check.');
+        return;
+      }
+
       const response = await qualityService.createQualityCheck({
-        batch: newCheckForm.batch_code, // This should be the batch UUID, not code
+        batch: resolvedBatchCode,
         image: newCheckForm.image,
-        defect_detected: false, // Will be determined by AI
+        defect_detected: false,
         severity: 'low',
         comments: newCheckForm.comments,
         ai_analysis_requested: true
@@ -440,14 +464,20 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Batch Code *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={newCheckForm.batch_code}
-                    onChange={(e) => setNewCheckForm({...newCheckForm, batch_code: e.target.value})}
+                  <select
+                    value={selectedBatch || newCheckForm.batch_code}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setSelectedBatch(v || null);
+                      setNewCheckForm({...newCheckForm, batch_code: v});
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                    placeholder="Enter batch code"
-                  />
+                  >
+                    <option value="">Select a batch...</option>
+                    {batchOptions.map(opt => (
+                      <option key={opt.id} value={opt.batch_code}>{opt.batch_code}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div>

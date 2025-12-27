@@ -16,26 +16,28 @@ import {
 } from 'lucide-react';
 
 interface QualityStandard {
-  id: number;
-  name: string;
-  description: string;
-  category: string;
-  min_threshold: number;
-  max_threshold: number;
-  measurement_unit: string;
-  is_active: boolean;
+  id: string;
+  product_type: string;
+  max_defects_per_batch: number;
+  critical_defect_tolerance: number;
+  quality_threshold: number;
+  thread_count_min?: number | null;
+  thread_count_max?: number | null;
+  weight_tolerance: number;
+  color_fastness_grade: string;
   created_at: string;
   updated_at: string;
 }
 
 interface StandardFormData {
-  name: string;
-  description: string;
-  category: string;
-  min_threshold: number;
-  max_threshold: number;
-  measurement_unit: string;
-  is_active: boolean;
+  product_type: string;
+  max_defects_per_batch: number;
+  critical_defect_tolerance: number;
+  quality_threshold: number;
+  thread_count_min?: number | null;
+  thread_count_max?: number | null;
+  weight_tolerance: number;
+  color_fastness_grade: string;
 }
 
 const QualityStandards: React.FC = () => {
@@ -44,101 +46,106 @@ const QualityStandards: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingStandard, setEditingStandard] = useState<QualityStandard | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
 
   const [formData, setFormData] = useState<StandardFormData>({
-    name: '',
-    description: '',
-    category: '',
-    min_threshold: 0,
-    max_threshold: 100,
-    measurement_unit: '',
-    is_active: true
+    product_type: '',
+    max_defects_per_batch: 5,
+    critical_defect_tolerance: 0,
+    quality_threshold: 0.95,
+    thread_count_min: undefined,
+    thread_count_max: undefined,
+    weight_tolerance: 0.05,
+    color_fastness_grade: '4-5'
   });
 
-  const categories = [
-    'Dimensional',
-    'Color',
-    'Texture',
-    'Weight',
-    'Strength',
-    'Appearance',
-    'Defects'
+  const productTypeOptions = [
+    { value: 'cotton_fabric', label: 'Cotton Fabric' },
+    { value: 'cotton_yarn', label: 'Cotton Yarn' },
+    { value: 'blended_fabric', label: 'Blended Fabric' },
+    { value: 'dyed_fabric', label: 'Dyed Fabric' },
+    { value: 'printed_fabric', label: 'Printed Fabric' }
   ];
-
-  const units = [
-    'mm',
-    'cm',
-    'inches',
-    'grams',
-    'kg',
-    'percentage',
-    'count',
-    'ratio'
-  ];
-
-  useEffect(() => {
-    loadStandards();
-  }, []);
 
   const loadStandards = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const response = await qualityService.getQualityStandards();
-      
-      if (response.success) {
-        setStandards(response.data.results || []);
-      } else {
-        setError(response.message || 'Failed to load quality standards');
-      }
+      const resp = await qualityService.getQualityStandards();
+      const list = (resp as any)?.data?.results ?? (resp as any)?.data ?? [];
+      setStandards(list);
     } catch (err) {
-      console.error('Failed to load standards:', err);
+      console.error('Failed to load standards', err);
       setError(err instanceof Error ? err.message : 'Failed to load standards');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    loadStandards();
+  }, []);
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setFormErrors({});
+    setError(null);
+
     try {
-      let response;
       if (editingStandard) {
-        response = await qualityService.updateQualityStandard(editingStandard.id, formData);
+        await qualityService.updateQualityStandard((editingStandard.id as any), formData as any);
       } else {
-        response = await qualityService.createQualityStandard(formData);
+        await qualityService.createQualityStandard(formData);
       }
 
-      if (response.success) {
-        await loadStandards();
-        resetForm();
-        setShowForm(false);
+      await loadStandards();
+      setShowForm(false);
+      resetForm();
+    } catch (err: any) {
+      // Prefer not to log full error stacks to the console in production UI flows.
+      // Map backend field errors to user-friendly messages.
+      if (err && err.errors && typeof err.errors === 'object') {
+        const fieldErrors: Record<string, string> = {};
+        Object.entries(err.errors).forEach(([k, v]) => {
+          let text = '';
+          if (Array.isArray(v)) text = v.join(' ');
+          else if (typeof v === 'string') text = v;
+          else text = JSON.stringify(v);
+
+          // Friendly rewrite for a common uniqueness error
+          if (k === 'product_type' && /already exists/i.test(text)) {
+            fieldErrors[k] = 'A quality standard for this product type already exists.';
+          } else {
+            fieldErrors[k] = text;
+          }
+        });
+        setFormErrors(fieldErrors);
       } else {
-        setError(response.message || 'Failed to save standard');
+        // Show a concise message only
+        const msg = err instanceof Error ? err.message : 'Failed to save standard';
+        setError(msg);
       }
-    } catch (err) {
-      console.error('Save error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save standard');
     }
   };
 
   const handleEdit = (standard: QualityStandard) => {
-    setEditingStandard(standard);
+                // setError(err instanceof Error ? err.message : 'Failed to save standard');
     setFormData({
-      name: standard.name,
-      description: standard.description,
-      category: standard.category,
-      min_threshold: standard.min_threshold,
-      max_threshold: standard.max_threshold,
-      measurement_unit: standard.measurement_unit,
-      is_active: standard.is_active
+      product_type: standard.product_type || '',
+      max_defects_per_batch: standard.max_defects_per_batch ?? 5,
+      critical_defect_tolerance: standard.critical_defect_tolerance ?? 0,
+      quality_threshold: standard.quality_threshold ?? 0.95,
+      thread_count_min: standard.thread_count_min ?? undefined,
+      thread_count_max: standard.thread_count_max ?? undefined,
+      weight_tolerance: standard.weight_tolerance ?? 0.05,
+      color_fastness_grade: standard.color_fastness_grade ?? '4-5'
     });
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this standard?')) {
       return;
     }
@@ -158,23 +165,29 @@ const QualityStandards: React.FC = () => {
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      description: '',
-      category: '',
-      min_threshold: 0,
-      max_threshold: 100,
-      measurement_unit: '',
-      is_active: true
+      product_type: '',
+      max_defects_per_batch: 5,
+      critical_defect_tolerance: 0,
+      quality_threshold: 0.95,
+      thread_count_min: undefined,
+      thread_count_max: undefined,
+      weight_tolerance: 0.05,
+      color_fastness_grade: '4-5'
     });
     setEditingStandard(null);
   };
 
-  const filteredStandards = standards.filter(standard => {
-    const matchesSearch = standard.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         standard.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !filterCategory || standard.category === filterCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredStandards = (() => {
+    const lowerSearch = (searchTerm || '').trim().toLowerCase();
+    return standards.filter(standard => {
+      const product = (standard.product_type ?? '').toString();
+      const display = product; // could map to label if needed
+
+      const matchesSearch = !lowerSearch || product.toLowerCase().includes(lowerSearch) || display.toLowerCase().includes(lowerSearch) || (standard.color_fastness_grade ?? '').toLowerCase().includes(lowerSearch);
+      const matchesFilter = !filterCategory || standard.product_type === filterCategory;
+      return matchesSearch && matchesFilter;
+    });
+  })();
 
   if (loading) {
     return (
@@ -229,9 +242,9 @@ const QualityStandards: React.FC = () => {
             onChange={(e) => setFilterCategory(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-md text-sm"
           >
-            <option value="">All Categories</option>
-            {categories.map(category => (
-              <option key={category} value={category}>{category}</option>
+            <option value="">All Product Types</option>
+            {productTypeOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
         </div>
@@ -272,36 +285,25 @@ const QualityStandards: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center mb-2">
-                      <h5 className="text-lg font-medium text-gray-900">{standard.name}</h5>
-                      {standard.is_active ? (
-                        <CheckCircle className="h-5 w-5 text-green-500 ml-2" />
-                      ) : (
-                        <X className="h-5 w-5 text-gray-400 ml-2" />
-                      )}
+                      <h5 className="text-lg font-medium text-gray-900">{productTypeOptions.find(p => p.value === standard.product_type)?.label || standard.product_type}</h5>
                     </div>
-                    
-                    <p className="text-sm text-gray-600 mb-3">{standard.description}</p>
-                    
+
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <span className="font-medium text-gray-700">Category:</span>
-                        <p className="text-gray-600">{standard.category}</p>
+                        <span className="font-medium text-gray-700">Max Defects:</span>
+                        <p className="text-gray-600">{standard.max_defects_per_batch}</p>
                       </div>
                       <div>
-                        <span className="font-medium text-gray-700">Range:</span>
-                        <p className="text-gray-600">
-                          {standard.min_threshold} - {standard.max_threshold} {standard.measurement_unit}
-                        </p>
+                        <span className="font-medium text-gray-700">Critical Tolerance:</span>
+                        <p className="text-gray-600">{standard.critical_defect_tolerance}</p>
                       </div>
                       <div>
-                        <span className="font-medium text-gray-700">Unit:</span>
-                        <p className="text-gray-600">{standard.measurement_unit}</p>
+                        <span className="font-medium text-gray-700">Quality Threshold:</span>
+                        <p className="text-gray-600">{standard.quality_threshold}</p>
                       </div>
                       <div>
-                        <span className="font-medium text-gray-700">Status:</span>
-                        <p className={`font-medium ${standard.is_active ? 'text-green-600' : 'text-gray-500'}`}>
-                          {standard.is_active ? 'Active' : 'Inactive'}
-                        </p>
+                        <span className="font-medium text-gray-700">Color Grade:</span>
+                        <p className="text-gray-600">{standard.color_fastness_grade}</p>
                       </div>
                     </div>
                   </div>
@@ -347,105 +349,34 @@ const QualityStandards: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Category *
+                    Product Type *
                   </label>
                   <select
                     required
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    value={formData.product_type}
+                    onChange={(e) => setFormData({...formData, product_type: e.target.value})}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
                   >
-                    <option value="">Select Category</option>
-                    {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
+                    <option value="">Select Product Type</option>
+                    {productTypeOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
+                  {formErrors.product_type && (
+                    <p className="text-sm text-red-600 mt-1">{formErrors.product_type}</p>
+                  )}
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Min Threshold *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Defects Per Batch</label>
                   <input
                     type="number"
-                    step="0.01"
-                    required
-                    value={formData.min_threshold}
-                    onChange={(e) => setFormData({...formData, min_threshold: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    min={0}
+                    value={formData.max_defects_per_batch}
+                    onChange={(e) => setFormData({...formData, max_defects_per_batch: Number(e.target.value)})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Max Threshold *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={formData.max_threshold}
-                    onChange={(e) => setFormData({...formData, max_threshold: parseFloat(e.target.value)})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Unit *
-                  </label>
-                  <select
-                    required
-                    value={formData.measurement_unit}
-                    onChange={(e) => setFormData({...formData, measurement_unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  >
-                    <option value="">Select Unit</option>
-                    {units.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-                  className="h-4 w-4 text-violet-600 focus:ring-violet-500 border-gray-300 rounded"
-                />
-                <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
-                  Active standard
-                </label>
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

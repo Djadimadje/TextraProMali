@@ -133,9 +133,16 @@ def generate_machine_pdf(request):
         data = [['Machine Name', 'Type', 'Status', 'Location', 'Install Date']]
         
         for machine in queryset[:100]:
+            # Ensure machine_type is serializable for display (could be a Model instance)
+            mt = getattr(machine, 'machine_type', None)
+            if mt:
+                mt_display = mt.name if hasattr(mt, 'name') else str(mt)
+            else:
+                mt_display = 'N/A'
+
             data.append([
                 machine.name or 'N/A',
-                machine.machine_type or 'N/A',
+                mt_display,
                 machine.get_status_display() if hasattr(machine, 'get_status_display') else machine.status,
                 # Machine model uses `building`, `floor`, and `location_details` instead of `location`
                 " ".join(filter(None, [getattr(machine, 'building', ''), getattr(machine, 'floor', ''), getattr(machine, 'location_details', '')])) or 'N/A',
@@ -190,8 +197,15 @@ def generate_machine_excel(request):
         
         # Data
         for row, machine in enumerate(queryset[:1000], 5):
+            # Ensure machine_type is serializable for Excel (avoid writing model instances)
+            mt = getattr(machine, 'machine_type', None)
+            if mt:
+                mt_val = mt.name if hasattr(mt, 'name') else str(mt)
+            else:
+                mt_val = 'N/A'
+
             ws.cell(row=row, column=1, value=machine.name or 'N/A')
-            ws.cell(row=row, column=2, value=machine.machine_type or 'N/A')
+            ws.cell(row=row, column=2, value=mt_val)
             ws.cell(row=row, column=3, value=machine.status or 'N/A')
             # Combine building/floor/location_details for location display
             ws.cell(row=row, column=4, value=(" ".join(filter(None, [getattr(machine, 'building', ''), getattr(machine, 'floor', ''), getattr(machine, 'location_details', '')])) or 'N/A'))
@@ -289,17 +303,41 @@ def generate_maintenance_excel(request):
         # Data
         for row, log in enumerate(queryset[:1000], 5):
             ws.cell(row=row, column=1, value=str(log.machine) if log.machine else 'N/A')
-            ws.cell(row=row, column=2, value=log.maintenance_type or 'N/A')
-            ws.cell(row=row, column=3, value=log.priority or 'N/A')
-            ws.cell(row=row, column=4, value=log.status or 'N/A')
-            ws.cell(row=row, column=5, value=log.start_date.strftime('%Y-%m-%d') if log.start_date else 'N/A')
-            ws.cell(row=row, column=6, value=log.completion_date.strftime('%Y-%m-%d') if log.completion_date else 'N/A')
-            ws.cell(row=row, column=7, value=float(log.cost) if log.cost else 0)
-            
-            # Calculate duration
-            if log.start_date and log.completion_date:
-                duration = (log.completion_date - log.start_date).days
-                ws.cell(row=row, column=8, value=duration)
+            # MaintenanceLog may not have a `maintenance_type` field in this project.
+            # Safely resolve it if present, otherwise fall back to priority display or 'N/A'.
+            mt = getattr(log, 'maintenance_type', None)
+            if mt:
+                mt_val = mt.name if hasattr(mt, 'name') else str(mt)
+            else:
+                mt_val = (log.get_priority_display() if hasattr(log, 'get_priority_display') else getattr(log, 'priority', 'N/A'))
+            ws.cell(row=row, column=2, value=mt_val)
+            ws.cell(row=row, column=3, value=(log.get_priority_display() if hasattr(log, 'get_priority_display') else (getattr(log, 'priority', 'N/A'))))
+            ws.cell(row=row, column=4, value=(log.get_status_display() if hasattr(log, 'get_status_display') else (getattr(log, 'status', 'N/A'))))
+            # Resolve start date: prefer explicit start_date, fall back to reported_at
+            s_dt = getattr(log, 'start_date', None) or getattr(log, 'reported_at', None)
+            if s_dt:
+                s_val = s_dt.strftime('%Y-%m-%d')
+            else:
+                s_val = 'N/A'
+            ws.cell(row=row, column=5, value=s_val)
+
+            # Completion date (may be missing)
+            c_dt = getattr(log, 'completion_date', None)
+            if c_dt:
+                c_val = c_dt.strftime('%Y-%m-%d')
+            else:
+                c_val = 'N/A'
+            ws.cell(row=row, column=6, value=c_val)
+
+            ws.cell(row=row, column=7, value=float(getattr(log, 'cost', 0)) if getattr(log, 'cost', None) else 0)
+
+            # Calculate duration using the best-available dates
+            if s_dt and c_dt:
+                try:
+                    duration = (c_dt - s_dt).days
+                    ws.cell(row=row, column=8, value=duration)
+                except Exception:
+                    ws.cell(row=row, column=8, value='N/A')
             else:
                 ws.cell(row=row, column=8, value='N/A')
         

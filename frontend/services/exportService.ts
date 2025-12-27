@@ -11,7 +11,8 @@ const loadXLSX = async () => {
       XLSX = await import('xlsx');
     } catch (error) {
       console.warn('XLSX library not available, Excel export disabled');
-      throw new Error('Excel export is not available. Please install the xlsx package.');
+      // Do not throw here — return null so callers can fallback gracefully to CSV
+      return null;
     }
   }
   return XLSX;
@@ -91,9 +92,15 @@ class ExportService {
     const title = options.title || 'Export Data';
     
     try {
-      const XLSX = await loadXLSX();
-      
-      // Prepare data with custom headers
+        const XLSX = await loadXLSX();
+
+        // If XLSX library couldn't be loaded, silently fallback to CSV
+        if (!XLSX) {
+          this.exportToCSV(data, { ...options, filename: filename.replace('.xlsx', '.csv') });
+          return;
+        }
+
+        // Prepare data with custom headers
       const headerKeys = Object.keys(headers).length > 0 ? Object.keys(headers) : Object.keys(data[0]);
       const headerLabels = headerKeys.map(key => headers[key] || key);
       

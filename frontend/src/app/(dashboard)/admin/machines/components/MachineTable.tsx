@@ -2,13 +2,8 @@
 
 import React from 'react';
 import { 
-  Eye, 
-  Edit, 
-  Trash2, 
-  Wrench, 
-  Clock,
+  Wrench,
   MapPin,
-  User,
   AlertTriangle
 } from 'lucide-react';
 import { Machine } from '../../../../../../services/machineService';
@@ -93,37 +88,32 @@ const MachineTable: React.FC<MachineTableProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-x-visible">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Machine
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Type & Status
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Location
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Operating Hours
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Maintenance
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Operator
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {machines.map((machine) => (
               <tr key={machine.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4">
                   <div className="flex flex-col">
                     <div className="text-sm font-medium text-gray-900">
                       {machine.machine_id}
@@ -136,9 +126,16 @@ const MachineTable: React.FC<MachineTableProps> = ({
                         {machine.manufacturer} {machine.model_number}
                       </div>
                     )}
+
+                    {/* Small-screen condensed info: show type & status */}
+                    <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 md:hidden">
+                      <span>{typeof machine.machine_type === 'object' ? machine.machine_type.name : 'Unknown'}</span>
+                      <span className="mx-1">•</span>
+                      {getStatusBadge(machine.operational_status)}
+                    </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col gap-1">
                     <div className="text-sm text-gray-900">
                       {typeof machine.machine_type === 'object' ? machine.machine_type.name : 'Unknown Type'}
@@ -146,7 +143,7 @@ const MachineTable: React.FC<MachineTableProps> = ({
                     {getStatusBadge(machine.operational_status)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center text-sm text-gray-900">
                     <MapPin className="h-4 w-4 text-gray-400 mr-1" />
                     <div className="flex flex-col">
@@ -159,7 +156,7 @@ const MachineTable: React.FC<MachineTableProps> = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col text-sm">
                     <div className="text-gray-900">
                       Total: {formatOperatingHours(machine.total_operating_hours)}
@@ -169,7 +166,7 @@ const MachineTable: React.FC<MachineTableProps> = ({
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap">
                   <div className="flex flex-col gap-1">
                     <div className="text-xs text-gray-500">
                       Last: {formatDate(machine.last_maintenance_date)}
@@ -183,55 +180,7 @@ const MachineTable: React.FC<MachineTableProps> = ({
                     )}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {machine.primary_operator ? (
-                    <div className="flex items-center text-sm">
-                      <User className="h-4 w-4 text-gray-400 mr-2" />
-                      <div className="flex flex-col">
-                        <span className="text-gray-900">
-                          {machine.primary_operator.first_name} {machine.primary_operator.last_name}
-                        </span>
-                        <span className="text-xs text-gray-500 capitalize">
-                          {machine.primary_operator.role}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-gray-400">Unassigned</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => onViewMachine(machine)}
-                      className="text-purple-600 hover:text-purple-900 p-1 rounded-md hover:bg-purple-50"
-                      title="View Details"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => onEditMachine(machine)}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded-md hover:bg-blue-50"
-                      title="Edit Machine"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => onScheduleMaintenance(machine)}
-                      className="text-green-600 hover:text-green-900 p-1 rounded-md hover:bg-green-50"
-                      title="Schedule Maintenance"
-                    >
-                      <Wrench className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteMachine(machine)}
-                      className="text-red-600 hover:text-red-900 p-1 rounded-md hover:bg-red-50"
-                      title="Delete Machine"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
+                
               </tr>
             ))}
           </tbody>

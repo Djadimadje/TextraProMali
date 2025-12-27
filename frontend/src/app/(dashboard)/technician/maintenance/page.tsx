@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { formatCurrency } from '../../../../../../lib/formatters';
 import { useAuth } from '../../../../contexts/AuthContext';
 import TechnicianSidebar from '../../../../../components/layout/TechnicianSidebar';
 import Header from '../../../../../components/layout/Header';
@@ -671,7 +672,7 @@ const MaintenancePage: React.FC = () => {
                           ) : (
                             <>Durée estimée: {task.estimatedDuration} min</>
                           )}
-                          {task.cost && <> • Coût: {task.cost.toLocaleString()} FCFA</>}
+                          {task.cost && <> • Coût: {formatCurrency(task.cost)}</>}
                         </div>
                         
                         <div className="flex gap-2">

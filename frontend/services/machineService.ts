@@ -83,6 +83,8 @@ export interface MachineUpdateData {
   warranty_expiry?: string;
   purchase_cost?: string;
   status?: 'active' | 'inactive' | 'pending' | 'archived';
+  // Allow site_code in updates when the UI provides it (optional)
+  site_code?: string;
 }
 
 export interface MachineFilters {

@@ -209,6 +209,18 @@ export interface ApiResponse<T> {
 
 class ReportsService {
   private baseUrl = `${BASE_URL}/reports`;
+  
+  // Client-side export service import for fallback when server Excel generation fails
+  // import dynamically to avoid circular load issues in some bundlers
+  private async loadExportService() {
+    try {
+      const mod = await import('./exportService');
+      return mod.exportService;
+    } catch (e) {
+      console.warn('Failed to load exportService for client-side fallback:', e);
+      return null;
+    }
+  }
 
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('access_token');
@@ -314,6 +326,97 @@ class ReportsService {
       return await response.blob();
     } catch (err) {
       console.error('ReportsService.exportSystemReport failed to read blob:', err);
+      throw err;
+    }
+  }
+
+  /**
+   * Try to export a system report via backend Excel/PDF endpoints.
+   * If backend Excel generation fails (500) and `format==='excel'`, attempt to
+   * fetch the JSON version and generate the Excel client-side as a fallback.
+   * Returns a Blob when the backend provided a file; returns null when
+   * the client-side fallback handled the download directly.
+   */
+  async exportSystemReportWithFallback(
+    reportType: 'production' | 'machines' | 'maintenance' | 'quality' | 'allocation' | 'analytics',
+    format: 'pdf' | 'excel',
+    filters?: ReportFilter
+  ): Promise<Blob | null> {
+    try {
+      // First attempt server-generated file
+      const blob = await this.exportSystemReport(reportType, format, filters as any);
+      return blob;
+    } catch (err) {
+      // If server Excel failed, try JSON + client-side export
+      const isServerError = err instanceof Error && /HTTP 5\d{2}/.test(err.message || '');
+      if (format === 'excel' && isServerError) {
+        try {
+          // Map report types to backend data endpoints (existing JSON APIs)
+          const apiRoot = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api/v1';
+          const dataEndpointMap: Record<string, string> = {
+            production: `${apiRoot}/workflow/batches/`,
+            machines: `${apiRoot}/machines/machines/`,
+            maintenance: `${apiRoot}/maintenance/`,
+            quality: `${apiRoot}/quality/`,
+            allocation: `${apiRoot}/allocation/`,
+            analytics: `${apiRoot}/analytics/`
+          };
+
+          const dataUrlBase = dataEndpointMap[reportType];
+          if (!dataUrlBase) throw new Error('No JSON fallback endpoint mapped for this report type');
+          const url = new URL(dataUrlBase);
+          if (filters) {
+            Object.entries(filters).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                url.searchParams.append(key, value.toString());
+              }
+            });
+          }
+
+          const response = await fetch(url.toString(), {
+            method: 'GET',
+            headers: this.getAuthHeaders()
+          });
+
+          if (!response.ok) {
+            const bodyText = await response.text().catch(() => '<unable to read>');
+            throw new Error(`JSON fallback failed: HTTP ${response.status} ${response.statusText} - ${bodyText}`);
+          }
+
+          const json = await response.json();
+
+          // Determine data payload shape
+          let data: any[] = [];
+          if (Array.isArray(json)) {
+            data = json;
+          } else if (json && json.data) {
+            data = Array.isArray(json.data) ? json.data : [json.data];
+          } else if (json && typeof json === 'object') {
+            // Attempt to find a top-level array
+            const arr = Object.values(json).find(v => Array.isArray(v));
+            data = arr || [];
+          }
+
+          if (!data || data.length === 0) {
+            throw new Error('No data returned from JSON fallback to generate Excel client-side');
+          }
+
+          const exportSvc = await this.loadExportService();
+          if (!exportSvc) throw new Error('Client export service unavailable for fallback export');
+
+          // Try to generate Excel client-side and let exportService handle download/fallbacks
+          await exportSvc.exportData(data, 'excel', { filename: `${reportType}_report_${new Date().toISOString().split('T')[0]}.xlsx` });
+
+          // Indicate fallback handled download; caller should not attempt its own download
+          return null;
+        } catch (fallbackErr) {
+          console.error('ReportsService: JSON fallback failed:', fallbackErr);
+          // Re-throw original error to surface original server message
+          throw err;
+        }
+      }
+
+      // Not a handled case; rethrow
       throw err;
     }
   }

@@ -38,38 +38,72 @@ const MaintenanceList: React.FC = () => {
         apiFilters.start_date = startDate.toISOString().split('T')[0];
       }
 
-      // Fetch maintenance logs
-      const logsResponse = await maintenanceService.getMaintenanceLogs({
-        ...apiFilters,
-        page_size: 1000
-      });
-      
-      if (logsResponse.success && logsResponse.data) {
-        // Format data for export
-        const exportData = logsResponse.data.map(log => ({
-          id: log.id.slice(0, 8),
-          machine: log.machine,
-          technician_name: log.technician_name,
-          issue_reported: log.issue_reported,
-          action_taken: log.action_taken || 'Not completed',
-          status: log.status,
-          priority: log.priority,
-          reported_at: new Date(log.reported_at).toLocaleDateString(),
-          resolved_at: log.resolved_at ? new Date(log.resolved_at).toLocaleDateString() : 'Not resolved',
-          downtime_hours: log.downtime_hours || 0,
-          cost: log.cost || 0,
-          parts_replaced: log.parts_replaced || 'None',
-          notes: log.notes || 'No notes'
-        }));
+      // Fetch maintenance logs in pages to avoid backend limits on large `page_size` values.
+      const pageSize = 100;
+      let page = 1;
+      let collected: any[] = [];
+      let lastResp: any = null;
+      const maxPages = 50; // safety cap
 
-        await exportService.exportToExcel(exportData, {
-          filename: `maintenance_tasks_${new Date().toISOString().split('T')[0]}.xlsx`,
-          headers: exportService.getMaintenanceLogsHeaders(),
-          title: 'Maintenance Tasks Export'
+      while (page <= maxPages) {
+        const resp = await maintenanceService.getMaintenanceLogs({
+          ...apiFilters,
+          page_size: pageSize,
+          page
         });
-      } else {
-        alert('No maintenance data available for export');
+        console.debug(`exportMaintenanceData - page ${page} resp:`, resp);
+        lastResp = resp;
+        if (resp && resp.success && Array.isArray(resp.data) && resp.data.length > 0) {
+          collected = collected.concat(resp.data);
+        }
+
+        // If API provides `next` or returned less than pageSize rows, stop
+        if (!resp || !resp.next || (Array.isArray(resp.data) && resp.data.length < pageSize)) {
+          break;
+        }
+        page += 1;
       }
+
+      const logsResponse = lastResp || { success: false, data: [] };
+
+      if (collected.length === 0) {
+        const serverCount = (logsResponse as any).count;
+        const serverMessage = (logsResponse as any).message || (logsResponse as any).detail || null;
+
+        if (serverCount && serverCount > 0) {
+          alert(`Server reports ${serverCount} records but none were returned for export. Check the console (logsResponse) for details.`);
+        } else if (serverMessage) {
+          alert(`No maintenance data available for export: ${serverMessage}`);
+        } else {
+          alert('No maintenance data available for export');
+        }
+
+        console.debug('No export rows after pagination. Collected:', collected, 'lastResp:', logsResponse);
+        return;
+      }
+
+      // Format collected data for export
+      const exportData = collected.map(log => ({
+        id: log.id.slice(0, 8),
+        machine: log.machine,
+        technician_name: log.technician_name,
+        issue_reported: log.issue_reported,
+        action_taken: log.action_taken || 'Not completed',
+        status: log.status,
+        priority: log.priority,
+        reported_at: new Date(log.reported_at).toLocaleDateString(),
+        resolved_at: log.resolved_at ? new Date(log.resolved_at).toLocaleDateString() : 'Not resolved',
+        downtime_hours: log.downtime_hours || 0,
+        cost: log.cost || 0,
+        parts_replaced: log.parts_replaced || 'None',
+        notes: log.notes || 'No notes'
+      }));
+
+      await exportService.exportToExcel(exportData, {
+        filename: `maintenance_tasks_${new Date().toISOString().split('T')[0]}.xlsx`,
+        headers: exportService.getMaintenanceLogsHeaders(),
+        title: 'Maintenance Tasks Export'
+      });
     } catch (err) {
       console.error('Failed to export maintenance data:', err);
       alert('Failed to export data. Please try again.');
@@ -143,7 +177,7 @@ const MaintenanceList: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <Card padding="lg">
+      {/*<Card padding="lg">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
@@ -191,7 +225,7 @@ const MaintenanceList: React.FC = () => {
             </Button>
           </div>
         </div>
-      </Card>
+      </Card>*/}
 
       {/* Task Table */}
       <MaintenanceTaskTable />

@@ -96,15 +96,26 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
     // Admin can be assigned any role
     if (userRole === 'admin') return roleChoices;
 
-    return roleChoices.filter(rc => {
+    const filtered = roleChoices.filter(rc => {
       const compatible = roleCompatibility[rc.value as string] || [];
       return compatible.includes(userRole as string);
     });
+
+    if (filtered.length === 0) {
+      console.warn('AllocationForm: no compatible role choices for user role', userRole, '— falling back to full list');
+      return roleChoices;
+    }
+
+    return filtered;
   }, [workforceData.user, users, roleChoices]);
 
   useEffect(() => {
     loadFormData();
   }, []);
+
+  // Today's date in YYYY-MM-DD for `min` attributes and validation
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const endMin = (workforceData.start_date && workforceData.start_date > todayISO) ? workforceData.start_date : todayISO;
 
   const loadFormData = async () => {
     try {
@@ -256,6 +267,10 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
         errors.start = 'Date has wrong format. Use YYYY-MM-DD (e.g., 2025-12-31).';
       } else {
         normalized.start = s;
+        // Prevent past start dates
+        if (s < todayISO) {
+          errors.start = 'Start date cannot be in the past.';
+        }
       }
     }
 
@@ -265,6 +280,10 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
         errors.end = 'Date has wrong format. Use YYYY-MM-DD (e.g., 2025-12-31).';
       } else {
         normalized.end = e;
+        // Prevent past end dates
+        if (e < todayISO) {
+          errors.end = 'End date cannot be in the past.';
+        }
       }
     }
 
@@ -382,6 +401,7 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
             type="date"
             value={workforceData.start_date}
             onChange={(e) => setWorkforceData({ ...workforceData, start_date: e.target.value })}
+            min={todayISO}
             className={`w-full px-3 py-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${dateErrors.start ? 'border-red-500' : 'border border-gray-300'}`}
             aria-invalid={!!dateErrors.start}
             aria-describedby={dateErrors.start ? 'start-date-error' : undefined}
@@ -397,7 +417,11 @@ const AllocationForm: React.FC<AllocationFormProps> = ({
           <input
             type="date"
             value={workforceData.end_date}
-            onChange={(e) => setWorkforceData({ ...workforceData, end_date: e.target.value })}
+            onChange={(e) => {
+              const val = e.target.value < endMin ? endMin : e.target.value;
+              setWorkforceData({ ...workforceData, end_date: val });
+            }}
+            min={endMin}
             className={`w-full px-3 py-2 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${dateErrors.end ? 'border-red-500' : 'border border-gray-300'}`}
             aria-invalid={!!dateErrors.end}
             aria-describedby={dateErrors.end ? 'end-date-error' : undefined}

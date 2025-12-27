@@ -288,8 +288,18 @@ class APIService {
   }
 
   async createMachine(machineData: Partial<Machine>): Promise<Machine> {
-    const response = await this.api.post<Machine>('/machines/machines/', machineData);
-    return response.data;
+    try {
+      const response = await this.api.post<Machine>('/machines/machines/', machineData);
+      return response.data;
+    } catch (error: any) {
+      console.error('createMachine error response status:', error.response?.status);
+      try {
+        console.error('createMachine error response data:', JSON.stringify(error.response?.data, null, 2));
+      } catch (jsonErr) {
+        console.error('createMachine error response (raw):', error.response?.data);
+      }
+      throw error;
+    }
   }
 
   async updateMachine(id: string, machineData: Partial<Machine>): Promise<Machine> {

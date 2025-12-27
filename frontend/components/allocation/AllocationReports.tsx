@@ -75,6 +75,9 @@ const AllocationReports: React.FC<AllocationReportsProps> = ({
   });
   const [exportLoading, setExportLoading] = useState(false);
 
+  const todayISO = new Date().toISOString().split('T')[0];
+  const endMin = (filters.startDate && filters.startDate > todayISO) ? filters.startDate : todayISO;
+
   // Calculate utilization reports
   const utilizationReports: UtilizationReport[] = React.useMemo(() => {
     const roleStats = workforceAllocations.reduce((acc, allocation) => {
@@ -597,14 +600,24 @@ const AllocationReports: React.FC<AllocationReportsProps> = ({
           <input
             type="date"
             value={filters.startDate}
-            onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+            min={todayISO}
+            onChange={(e) => {
+              const val = e.target.value < todayISO ? todayISO : e.target.value;
+              // If the new start is after the current end, move end forward to start
+              const newEnd = (filters.endDate && filters.endDate < val) ? val : filters.endDate;
+              setFilters({ ...filters, startDate: val, endDate: newEnd });
+            }}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm"
           />
           <span className="text-gray-500">to</span>
           <input
             type="date"
             value={filters.endDate}
-            onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+            min={endMin}
+            onChange={(e) => {
+              const val = e.target.value < endMin ? endMin : e.target.value;
+              setFilters({ ...filters, endDate: val });
+            }}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm"
           />
           <button className="inline-flex items-center px-3 py-1 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700">

@@ -355,7 +355,30 @@ class QualityService {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Failed to create quality standard: ${response.statusText}`);
+
+      // If the backend returned field-level validation errors (object), flatten them
+      let message = errorData.message || null;
+      if (!message && errorData && typeof errorData === 'object') {
+        const parts: string[] = [];
+        Object.entries(errorData).forEach(([key, val]) => {
+          if (Array.isArray(val)) {
+            parts.push(`${key}: ${val.join(' ')}`);
+          } else if (typeof val === 'string') {
+            parts.push(`${key}: ${val}`);
+          } else {
+            try {
+              parts.push(`${key}: ${JSON.stringify(val)}`);
+            } catch (e) {
+              // ignore
+            }
+          }
+        });
+        if (parts.length) message = parts.join(' | ');
+      }
+
+      const err = new Error(message || `Failed to create quality standard: ${response.statusText}`);
+      (err as any).errors = errorData;
+      throw err;
     }
 
     const responseData = await response.json();

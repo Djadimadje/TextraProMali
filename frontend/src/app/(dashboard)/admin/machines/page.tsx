@@ -341,17 +341,18 @@ const MachinesPage: React.FC = () => {
       } else {
         // Create new machine
         const createData: MachineCreateData = {
-          machine_id: machineData.machine_id || '',
+          // Only include machine_id when provided (backend auto-generates it otherwise)
+          ...(machineData.machine_id ? { machine_id: machineData.machine_id } : {}),
           name: machineData.name || '',
-          machine_type: typeof machineData.machine_type === 'string' 
-            ? machineData.machine_type 
+          machine_type: typeof machineData.machine_type === 'string'
+            ? machineData.machine_type
             : machineData.machine_type || '',
           operational_status: machineData.operational_status || 'idle',
           building: machineData.building,
           floor: machineData.floor,
           primary_operator: machineData.primary_operator,
           notes: machineData.notes,
-          site_code: 'SITE001' // Default site code
+          site_code: machineData.site_code || 'SITE001' // Default site code
         };
         
         console.log('Creating machine with data:', createData);
@@ -467,10 +468,10 @@ const MachinesPage: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-x-hidden">
       <AdminSidebar />
       
-      <div className="flex-1 flex flex-col overflow-hidden ml-[240px]">
+      <div className="flex-1 flex flex-col overflow-hidden ml-0 lg:ml-[240px]">
         <Header />
         
         <main className="flex-1 overflow-y-auto p-6">

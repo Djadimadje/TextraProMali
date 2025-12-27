@@ -218,9 +218,10 @@ class UserService {
       // Get all users and calculate stats
       const users = await this.getUsers();
       const userList = users.data.results;
-      
+
       const stats: UserStats = {
-        total_users: userList.length,
+        // Use server-side total count for accuracy (handles pagination)
+        total_users: users.data.count,
         active_users: userList.filter(u => u.status === 'active').length,
         pending_users: userList.filter(u => u.status === 'pending').length,
         inactive_users: userList.filter(u => u.status === 'inactive').length,

@@ -9,11 +9,11 @@ import Header from '../../../../../components/layout/Header';
 import UserStatsCards from './components/UserStatsCards';
 import SearchAndFilters from './components/SearchAndFilters';
 import UserTable from './components/UserTable';
-import UserFormModal from './components/UserFormModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import ExportModal from './components/ExportModal';
 import SupervisorAssignModal from './components/SupervisorAssignModal';
 import { userService, User, UserStats as ApiUserStats } from '../../../../../services/userService';
+import UserFormModal from './components/UserFormModal';
 
 interface UserStats extends ApiUserStats {
   new_users_this_month: number;
@@ -129,13 +129,18 @@ const UserManagementPage: React.FC = () => {
           department: savedUser.department,
           employee_id: savedUser.employee_id,
           phone_number: savedUser.phone_number,
-          status: savedUser.status
+            status: savedUser.status,
+            // Ensure supervisor is sent: prefer the value from the form, fall back to the original
+            ...(savedUser.supervisor || selectedUser.supervisor ? { supervisor: (savedUser.supervisor || selectedUser.supervisor) } : {})
         };
         
         const response = await userService.updateUser(selectedUser.id, updateData);
         if (response.success) {
           // Update local state
-          setUsers(prev => prev.map(u => u.id === selectedUser.id ? response.data : u));
+            setUsers(prev => prev.map(u => u.id === selectedUser.id ? response.data : u));
+            // Close edit modal after successful save
+            setShowEditModal(false);
+            setSelectedUser(null);
         } else {
           throw new Error(response.message || 'Failed to update user');
         }

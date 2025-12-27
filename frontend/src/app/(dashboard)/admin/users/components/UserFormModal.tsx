@@ -224,7 +224,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
         employee_id: formData.employee_id ? formData.employee_id.toUpperCase() : undefined,
         phone_number: formData.phone_number || undefined,
         site_location: formData.site_location || undefined,
-        supervisor: formData.supervisor || undefined,
+        // Supervisor intentionally not included in edit form — allocation system manages it
         bio: formData.bio || undefined,
         is_active: formData.is_active,
       };
@@ -480,22 +480,7 @@ const UserFormModal: React.FC<UserFormModalProps> = ({
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor</label>
-                <select
-                  value={formData.supervisor}
-                  onChange={(e) => setFormData({...formData, supervisor: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Select Supervisor (Optional)</option>
-                  {users.filter(u => u.role === 'admin' || u.role === 'supervisor').map(supervisor => (
-                    <option key={supervisor.id} value={supervisor.id}>
-                      {supervisor.first_name} {supervisor.last_name} ({supervisor.role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
+              {/* Supervisor assignment removed from edit form — handled via Allocation system */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
                 <textarea

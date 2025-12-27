@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus,
   Search,
@@ -43,7 +43,14 @@ const WorkflowPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const endDateRef = useRef<HTMLInputElement | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
   // Filter and search states
   const [filters, setFilters] = useState<BatchWorkflowFilters>({
@@ -351,6 +358,8 @@ const WorkflowPage: React.FC = () => {
   };
 
   const handleCreateBatch = async (batchData: any) => {
+    setFormErrors({});
+    setCreating(true);
     try {
       const response = await workflowService.createBatchWorkflow(batchData);
       if (response.success) {
@@ -360,9 +369,75 @@ const WorkflowPage: React.FC = () => {
       } else {
         setError(response.message || 'Failed to create batch');
       }
-    } catch (err) {
-      console.error('Failed to create batch:', err);
-      setError('Failed to create batch workflow');
+    } catch (err: any) {
+      // Log both the raw object and a JSON-stringified snapshot for clarity
+      try {
+        console.error('Failed to create batch:', err, JSON.stringify(err));
+      } catch (logErr) {
+        console.error('Failed to create batch (stringify failed):', err);
+      }
+      // Normalize into strings so UI shows meaningful text instead of an object
+      const parsedFieldErrors: Record<string, string> = {};
+
+      const serverMessageRaw = (err && (err.serverMessage ?? err.message)) ?? null;
+      const errorsRaw = err && (err.errors ?? null);
+
+      // Helper to stringify possibly-nonstring values
+      const stringify = (v: any) => {
+        if (v === null || v === undefined) return '';
+        if (typeof v === 'string') return v;
+        try {
+          return JSON.stringify(v);
+        } catch {
+          return String(v);
+        }
+      };
+
+      // Parse field errors
+      if (errorsRaw) {
+        if (Array.isArray(errorsRaw)) {
+          // Try to extract field and message from Django-style string representations
+          errorsRaw.forEach((item: any) => {
+            if (typeof item === 'string') {
+              const m = /'([^']+)'\s*:\s*\[ErrorDetail\(string='([^']+)'/.exec(item);
+              if (m) parsedFieldErrors[m[1]] = m[2];
+              else parsedFieldErrors['_all'] = (parsedFieldErrors['_all'] ? parsedFieldErrors['_all'] + ' ' : '') + item;
+            } else {
+              // non-string entry
+              parsedFieldErrors['_all'] = (parsedFieldErrors['_all'] ? parsedFieldErrors['_all'] + ' ' : '') + stringify(item);
+            }
+          });
+        } else if (typeof errorsRaw === 'object') {
+          Object.entries(errorsRaw).forEach(([k, v]) => {
+            if (Array.isArray(v) && v.length > 0) parsedFieldErrors[k] = stringify(v[0]);
+            else parsedFieldErrors[k] = stringify(v);
+          });
+        } else {
+          parsedFieldErrors['_all'] = stringify(errorsRaw);
+        }
+      }
+
+      // Determine top-level message
+      let topMessage = '';
+      if (serverMessageRaw) {
+        if (typeof serverMessageRaw === 'string') topMessage = serverMessageRaw;
+        else if (typeof serverMessageRaw === 'object') {
+          // try common fields
+          topMessage = serverMessageRaw.message || serverMessageRaw.detail || stringify(serverMessageRaw);
+        } else {
+          topMessage = String(serverMessageRaw);
+        }
+      }
+
+      if (Object.keys(parsedFieldErrors).length > 0) {
+        setFormErrors(parsedFieldErrors);
+      }
+
+      if (topMessage) setError(topMessage);
+      else if (parsedFieldErrors['_all']) setError(parsedFieldErrors['_all']);
+      else setError('Failed to create batch workflow');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -636,6 +711,9 @@ const WorkflowPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Batch Workflow</h3>
+            {formErrors && formErrors['_all'] && (
+              <div className="mb-3 text-sm text-red-600">{formErrors['_all']}</div>
+            )}
             
             <form onSubmit={(e) => {
               e.preventDefault();
@@ -646,6 +724,18 @@ const WorkflowPage: React.FC = () => {
                 start_date: formData.get('start_date'),
                 end_date: formData.get('end_date')
               };
+              // client-side date validation
+              const s = batchData.start_date ? String(batchData.start_date) : '';
+              const en = batchData.end_date ? String(batchData.end_date) : '';
+              const today = new Date(todayStr);
+              if (s && new Date(s) < today) {
+                setFormErrors({ start_date: 'Start date cannot be in the past' });
+                return;
+              }
+              if (s && en && new Date(en) <= new Date(s)) {
+                setFormErrors({ end_date: 'End date must be after start date' });
+                return;
+              }
               handleCreateBatch(batchData);
             }}>
               <div className="space-y-4">
@@ -660,6 +750,9 @@ const WorkflowPage: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     required
                   />
+                  {formErrors.batch_code && (
+                    <p className="mt-1 text-xs text-red-600">{formErrors.batch_code}</p>
+                  )}
                 </div>
                 
                 <div>
@@ -682,9 +775,23 @@ const WorkflowPage: React.FC = () => {
                     <input
                       type="date"
                       name="start_date"
-                      defaultValue={new Date().toISOString().split('T')[0]}
+                      defaultValue={todayStr}
+                      min={todayStr}
+                      onPaste={(e) => { e.preventDefault(); setFormErrors({ start_date: 'Pasting dates is disabled' }); }}
+                      onChange={(e) => {
+                        // when start date changes, ensure end date min updates
+                        const val = e.target.value;
+                        if (endDateRef.current) {
+                          const minForEnd = val ? (new Date(val).toISOString().split('T')[0]) : tomorrowStr;
+                          endDateRef.current.min = minForEnd;
+                        }
+                        setFormErrors((prev) => ({ ...prev, start_date: '' }));
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
+                    {formErrors.start_date && (
+                      <p className="mt-1 text-xs text-red-600">{formErrors.start_date}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -692,11 +799,18 @@ const WorkflowPage: React.FC = () => {
                       End Date
                     </label>
                     <input
+                      ref={endDateRef}
                       type="date"
                       name="end_date"
                       defaultValue={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                      min={tomorrowStr}
+                      onPaste={(e) => { e.preventDefault(); setFormErrors({ end_date: 'Pasting dates is disabled' }); }}
+                      onChange={() => setFormErrors((prev) => ({ ...prev, end_date: '' }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
+                    {formErrors.end_date && (
+                      <p className="mt-1 text-xs text-red-600">{formErrors.end_date}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -711,9 +825,10 @@ const WorkflowPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  disabled={creating}
+                  className={`flex-1 px-4 py-2 text-white rounded-lg ${creating ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}`}
                 >
-                  Create Batch
+                  {creating ? 'Creating…' : 'Create Batch'}
                 </button>
               </div>
             </form>

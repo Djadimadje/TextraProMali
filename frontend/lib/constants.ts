@@ -138,9 +138,15 @@ export const MALI_CONFIG = {
     end: '18:00'
   },
   work_days: [1, 2, 3, 4, 5, 6], // Monday to Saturday
-  currency_symbol: 'CFA',
-  // Format currency in West African CFA franc (XOF) - Mali's official currency
-  currency_format: (amount: number) => `${amount.toLocaleString('fr-ML')} CFA`
+  currency_symbol: 'XOF',
+  // Format currency in West African CFA franc (XOF) using Intl for consistent formatting
+  currency_format: (amount: number) => {
+    try {
+      return new Intl.NumberFormat('fr-ML', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(amount);
+    } catch (e) {
+      return `${amount.toLocaleString('fr-ML')} XOF`;
+    }
+  }
 } as const;
 
 // Validation Messages (French)

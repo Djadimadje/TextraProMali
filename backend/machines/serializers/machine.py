@@ -54,6 +54,9 @@ class MachineSerializer(serializers.ModelSerializer):
             'maintenance_urgency', 'is_operational', 'needs_maintenance',
             'created_at', 'updated_at'
         ]
+        extra_kwargs = {
+            'machine_id': {'required': False, 'allow_blank': True}
+        }
     
     def validate_machine_id(self, value):
         """Validate machine ID format"""

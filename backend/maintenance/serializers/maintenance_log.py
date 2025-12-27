@@ -111,12 +111,18 @@ class MaintenanceLogCreateSerializer(serializers.ModelSerializer):
         
         # Create the maintenance log
         maintenance_log = MaintenanceLog.objects.create(**validated_data)
-        
-        # Predict next due date using AI service
-        next_due_date = PredictiveMaintenanceService.predict_next_due(machine)
-        maintenance_log.next_due_date = next_due_date
-        maintenance_log.save(update_fields=['next_due_date'])
-        
+
+        # Predict next due date using AI service, but do not let prediction errors block creation
+        try:
+            next_due_date = PredictiveMaintenanceService.predict_next_due(machine)
+            maintenance_log.next_due_date = next_due_date
+            maintenance_log.save(update_fields=['next_due_date'])
+        except Exception as e:
+            # Log the error and continue; prediction failures should not prevent log creation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception('PredictiveMaintenanceService failed during create: %s', e)
+
         return maintenance_log
 
 
