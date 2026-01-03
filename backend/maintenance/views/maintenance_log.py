@@ -118,7 +118,22 @@ class MaintenanceLogViewSet(viewsets.ModelViewSet):
         import logging
         logger = logging.getLogger(__name__)
         try:
-            return super().create(request, *args, **kwargs)
+            # Ensure technician is set to the requesting user when omitted
+            data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+            if not data.get('technician'):
+                # set technician to current user's id
+                try:
+                    data['technician'] = request.user.id
+                except Exception:
+                    # fallback: leave data unchanged
+                    pass
+
+            # Run serializer validation and create using the normal flow
+            serializer = self.get_serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
         except Exception as e:
             # Log full exception server-side
             logger.exception('Unhandled exception in MaintenanceLogViewSet.create: %s', e)

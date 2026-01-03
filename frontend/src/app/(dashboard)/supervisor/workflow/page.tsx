@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../../contexts/AuthContext';
 import SupervisorSidebar from '../../../../../components/layout/SupervisorSidebar';
 import Header from '../../../../../components/layout/Header';
@@ -7,6 +7,7 @@ import Card from '../../../../../components/ui/Card';
 import Button from '../../../../../components/ui/Button';
 import Badge from '../../../../../components/ui/Badge';
 import ProgressBar from '../../../../../components/ui/ProgressBar';
+import BatchWorkflowModal from '../../admin/workflow/components/BatchWorkflowModal';
 import { 
   Workflow,
   Plus,
@@ -27,6 +28,10 @@ import {
   Target,
   TrendingUp
 } from 'lucide-react';
+import { formatDate } from '../../../../../lib/formatters';
+import workflowService from '../../../../../services/workflowService';
+import ProductionCalendar from '../../../../components/workflow/ProductionCalendar';
+
 
 interface ProductionBatch {
   id: string;
@@ -58,109 +63,214 @@ interface WorkflowStep {
 const WorkflowPage: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'batches' | 'planning' | 'monitoring'>('overview');
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
-
+  const [productionBatches, setProductionBatches] = useState<ProductionBatch[]>([]);
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const pollingRef = useRef<number | null>(null);
+  const isPollingRef = useRef(false);
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1000);
-    return () => clearTimeout(timer);
+    let mounted = true;
+
+    async function load() {
+      setLoading(true);
+      try {
+        const [dashboard, batchesResp, process] = await Promise.all([
+          workflowService.getWorkflowDashboard(),
+          workflowService.getBatches(),
+          workflowService.getProcessAnalytics(),
+        ]);
+
+        if (!mounted) return;
+
+        // Map batches from API to the local ProductionBatch shape with fallbacks
+        const batchList = Array.isArray(batchesResp) ? batchesResp : (batchesResp?.results || []);
+        const mappedBatches: ProductionBatch[] = (batchList || []).map((b: any) => ({
+          id: String(b.id || b.batch_code || b.batchCode || b.pk || ''),
+          batchCode: b.batch_code || b.batchCode || b.code || 'N/A',
+          productType: b.product_type || b.productType || b.product || 'Unknown',
+          status: (b.status || 'planned') as any,
+          priority: (b.priority || 'medium') as any,
+          startDate: b.start_date || b.startDate || b.start || new Date().toISOString(),
+          endDate: b.end_date || b.endDate || b.end || new Date().toISOString(),
+          progress: b.progress_percentage ?? b.progress ?? 0,
+          assignedTeam: b.assigned_team || b.team || '—',
+          supervisor: b.supervisor_name || b.supervisor || (b.supervisor?.username ?? '—'),
+          targetQuantity: b.target_quantity || b.targetQuantity || b.target || 0,
+          currentQuantity: b.current_quantity || b.currentQuantity || b.current || 0,
+          qualityScore: b.quality_score || b.qualityScore || b.quality || 0,
+          estimatedCompletion: b.estimated_completion || b.estimatedCompletion || b.end_date || new Date().toISOString(),
+          notes: b.notes || b.note || b.remarks || undefined,
+        }));
+
+        // Map process analytics stages to WorkflowStep
+        const mappedSteps: WorkflowStep[] = (process?.stages || []).map((s: any, idx: number) => {
+          // Normalize status to the WorkflowStep union to satisfy TypeScript
+          const rawStatus = String(s.status ?? '').toLowerCase();
+          const allowed = ['active', 'pending', 'completed', 'blocked'] as const;
+          const status = (allowed.includes(rawStatus as any) ? rawStatus : (s.avg_duration && s.avg_duration > 0 ? 'active' : 'pending')) as WorkflowStep['status'];
+
+          return {
+            id: String(s.name || s.id || `stage-${idx}`),
+            name: s.name || `Stage ${idx + 1}`,
+            status,
+            duration: Math.round(s.avg_duration || s.avgDuration || 0),
+            assignedWorkers: s.assigned_workers || s.assignedWorkers || 0,
+            efficiency: Math.round(s.efficiency_score ?? s.efficiency ?? 0),
+          };
+        });
+
+        // If no mapped steps, attempt to derive minimal steps from dashboard bottlenecks
+        if (mappedSteps.length === 0 && dashboard?.bottlenecks) {
+          const derived: WorkflowStep[] = dashboard.bottlenecks.map((b: any, idx: number) => ({
+            id: `bn-${idx}`,
+            name: b.stage || `Stage ${idx + 1}`,
+            status: 'active' as WorkflowStep['status'],
+            duration: Math.round(b.avg_duration || 0),
+            assignedWorkers: b.batch_count || 0,
+            efficiency: Math.round((dashboard?.stats?.current_efficiency) || 0),
+          }));
+          setWorkflowSteps(derived);
+        } else {
+          setWorkflowSteps(mappedSteps);
+        }
+
+        setProductionBatches(mappedBatches);
+        setDashboardData(dashboard || null);
+      } catch (err) {
+        console.error('Failed to load workflow data', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => { mounted = false; };
   }, []);
 
-  const productionBatches: ProductionBatch[] = [
-    {
-      id: 'PB001',
-      batchCode: 'BATCH-2025-0892',
-      productType: 'Cotton Fabric Premium',
-      status: 'in_progress',
-      priority: 'high',
-      startDate: '2025-08-25T06:00:00Z',
-      endDate: '2025-08-26T18:00:00Z',
-      progress: 68,
-      assignedTeam: 'Équipe Alpha',
-      supervisor: 'Amadou Traoré',
-      targetQuantity: 2500,
-      currentQuantity: 1700,
-      qualityScore: 94.5,
-      estimatedCompletion: '2025-08-26T16:30:00Z'
-    },
-    {
-      id: 'PB002',
-      batchCode: 'BATCH-2025-0893',
-      productType: 'Dyed Cotton Blend',
-      status: 'planned',
-      priority: 'medium',
-      startDate: '2025-08-26T06:00:00Z',
-      endDate: '2025-08-27T14:00:00Z',
-      progress: 0,
-      assignedTeam: 'Équipe Beta',
-      supervisor: 'Fatima Diallo',
-      targetQuantity: 1800,
-      currentQuantity: 0,
-      qualityScore: 0,
-      estimatedCompletion: '2025-08-27T14:00:00Z'
-    },
-    {
-      id: 'PB003',
-      batchCode: 'BATCH-2025-0891',
-      productType: 'Printed Fabric Special',
-      status: 'completed',
-      priority: 'high',
-      startDate: '2025-08-23T06:00:00Z',
-      endDate: '2025-08-24T18:00:00Z',
-      progress: 100,
-      assignedTeam: 'Équipe Gamma',
-      supervisor: 'Ibrahim Keita',
-      targetQuantity: 2200,
-      currentQuantity: 2180,
-      qualityScore: 96.8,
-      estimatedCompletion: '2025-08-24T17:45:00Z'
-    },
-    {
-      id: 'PB004',
-      batchCode: 'BATCH-2025-0894',
-      productType: 'Yarn Production',
-      status: 'paused',
-      priority: 'urgent',
-      startDate: '2025-08-25T14:00:00Z',
-      endDate: '2025-08-26T06:00:00Z',
-      progress: 35,
-      assignedTeam: 'Équipe Delta',
-      supervisor: 'Aïcha Cissé',
-      targetQuantity: 1500,
-      currentQuantity: 525,
-      qualityScore: 89.2,
-      estimatedCompletion: '2025-08-26T08:00:00Z',
-      notes: 'Machine maintenance required'
+  const refreshBatches = async () => {
+    try {
+      const batchesResp = await workflowService.getBatches();
+      const batchList = Array.isArray(batchesResp) ? batchesResp : (batchesResp?.results || []);
+      const mappedBatches: ProductionBatch[] = (batchList || []).map((b: any) => ({
+        id: String(b.id || b.batch_code || b.batchCode || b.pk || ''),
+        batchCode: b.batch_code || b.batchCode || b.code || 'N/A',
+        productType: b.product_type || b.productType || b.product || 'Unknown',
+        status: (b.status || 'planned') as any,
+        priority: (b.priority || 'medium') as any,
+        startDate: b.start_date || b.startDate || b.start || new Date().toISOString(),
+        endDate: b.end_date || b.endDate || b.end || new Date().toISOString(),
+        progress: b.progress_percentage ?? b.progress ?? 0,
+        assignedTeam: b.assigned_team || b.team || '—',
+        supervisor: b.supervisor_name || b.supervisor || (b.supervisor?.username ?? '—'),
+        targetQuantity: b.target_quantity || b.targetQuantity || b.target || 0,
+        currentQuantity: b.current_quantity || b.currentQuantity || b.current || 0,
+        qualityScore: b.quality_score || b.qualityScore || b.quality || 0,
+        estimatedCompletion: b.estimated_completion || b.estimatedCompletion || b.end_date || new Date().toISOString(),
+        notes: b.notes || b.note || b.remarks || undefined,
+      }));
+      setProductionBatches(mappedBatches);
+    } catch (err) {
+      console.error('Failed to refresh batches', err);
     }
-  ];
+  };
 
-  const workflowSteps: WorkflowStep[] = [
-    { id: 'WS001', name: 'Raw Material Preparation', status: 'completed', duration: 120, assignedWorkers: 4, efficiency: 98 },
-    { id: 'WS002', name: 'Spinning Process', status: 'completed', duration: 180, assignedWorkers: 6, efficiency: 95 },
-    { id: 'WS003', name: 'Weaving Operation', status: 'active', duration: 240, assignedWorkers: 8, efficiency: 92 },
-    { id: 'WS004', name: 'Dyeing Process', status: 'pending', duration: 150, assignedWorkers: 5, efficiency: 0 },
-    { id: 'WS005', name: 'Finishing & Quality Check', status: 'pending', duration: 90, assignedWorkers: 3, efficiency: 0 }
-  ];
+  const pollOnce = async () => {
+    if (isPollingRef.current) return;
+    isPollingRef.current = true;
+    try {
+      await refreshBatches();
+      // refresh analytics and dashboard as part of monitoring
+      try {
+        const process = await workflowService.getProcessAnalytics();
+        const mappedSteps: WorkflowStep[] = (process?.stages || []).map((s: any, idx: number) => {
+          const rawStatus = String(s.status ?? '').toLowerCase();
+          const allowed = ['active', 'pending', 'completed', 'blocked'] as const;
+          const status = (allowed.includes(rawStatus as any) ? rawStatus : (s.avg_duration && s.avg_duration > 0 ? 'active' : 'pending')) as WorkflowStep['status'];
+          return {
+            id: String(s.name || s.id || `stage-${idx}`),
+            name: s.name || `Stage ${idx + 1}`,
+            status,
+            duration: Math.round(s.avg_duration || s.avgDuration || 0),
+            assignedWorkers: s.assigned_workers || s.assignedWorkers || 0,
+            efficiency: Math.round(s.efficiency_score ?? s.efficiency ?? 0),
+          };
+        });
+        setWorkflowSteps(mappedSteps);
+      } catch (e) {
+        console.warn('Failed to refresh process analytics during polling', e);
+      }
 
-  const getStatusIcon = (status: string) => {
+      try {
+        const d = await workflowService.getWorkflowDashboard();
+        setDashboardData(d || null);
+      } catch (e) {
+        // non-fatal
+      }
+    } finally {
+      isPollingRef.current = false;
+    }
+  };
+
+  const startMonitoring = () => {
+    if (isMonitoring) return;
+    setIsMonitoring(true);
+    // switch to monitoring tab so the live view is visible
+    setActiveTab('monitoring');
+    // run immediately
+    pollOnce();
+    // then set interval
+    const id = window.setInterval(() => pollOnce(), 5000);
+    pollingRef.current = id;
+  };
+
+  const stopMonitoring = () => {
+    setIsMonitoring(false);
+    if (pollingRef.current) {
+      window.clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      // cleanup on unmount
+      if (pollingRef.current) window.clearInterval(pollingRef.current);
+      pollingRef.current = null;
+      isPollingRef.current = false;
+    };
+  }, []);
+
+  // Compute average efficiency for display (defensive)
+  const avgEfficiencyDisplay = Math.round(
+    workflowSteps && workflowSteps.length > 0
+      ? workflowSteps.reduce((sum, s) => sum + (s.efficiency || 0), 0) / workflowSteps.length
+      : 0
+  );
+
+  // Helper utilities for UI
+  const getStepStatusColor = (status: string) => {
     switch (status) {
-      case 'in_progress': return <Play className="w-4 h-4 text-blue-600" />;
-      case 'completed': return <CheckCircle className="w-4 h-4 text-green-600" />;
-      case 'paused': return <Pause className="w-4 h-4 text-yellow-600" />;
-      case 'planned': return <Clock className="w-4 h-4 text-gray-600" />;
-      case 'cancelled': return <Square className="w-4 h-4 text-red-600" />;
-      default: return <AlertTriangle className="w-4 h-4 text-gray-600" />;
+      case 'active': return 'info';
+      case 'pending': return 'default';
+      case 'completed': return 'success';
+      case 'blocked': return 'danger';
+      default: return 'default';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'in_progress': return 'info';
       case 'completed': return 'success';
-      case 'paused': return 'warning';
+      case 'in_progress': return 'info';
       case 'planned': return 'default';
+      case 'paused': return 'warning';
       case 'cancelled': return 'danger';
       default: return 'default';
     }
@@ -171,38 +281,43 @@ const WorkflowPage: React.FC = () => {
       case 'urgent': return 'danger';
       case 'high': return 'warning';
       case 'medium': return 'info';
-      case 'low': return 'success';
+      case 'low': return 'default';
       default: return 'default';
     }
   };
 
-  const getStepStatusColor = (status: string) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return 'success';
-      case 'active': return 'info';
-      case 'pending': return 'default';
-      case 'blocked': return 'danger';
-      default: return 'default';
+      case 'in_progress': return <Play className="w-5 h-5 text-blue-600" />;
+      case 'completed': return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'paused': return <Pause className="w-5 h-5 text-yellow-600" />;
+      case 'cancelled': return <AlertTriangle className="w-5 h-5 text-red-600" />;
+      default: return <Square className="w-5 h-5 text-gray-600" />;
     }
   };
 
-  const filteredBatches = productionBatches.filter(batch => {
+  const filteredBatches = productionBatches.filter((batch) => {
     if (filterStatus !== 'all' && batch.status !== filterStatus) return false;
     if (filterPriority !== 'all' && batch.priority !== filterPriority) return false;
     return true;
   });
+  // Allow supervisor access either from context `user` or from localStorage fallback
+  let isSupervisor = false;
+  if (user && user.role === 'supervisor') {
+    isSupervisor = true;
+  } else if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.role === 'supervisor') isSupervisor = true;
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
+  }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  if (!user || user.role !== 'supervisor') {
+  if (!isSupervisor) {
     return <div>Access denied.</div>;
   }
 
@@ -225,14 +340,14 @@ const WorkflowPage: React.FC = () => {
               </div>
               
               <div className="flex gap-3">
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" onClick={() => setShowCreateModal(true)}>
                   <Calendar className="mr-2" size={16} />
                   Planifier
                 </Button>
-                <Button variant="primary" size="sm">
+                {/*<Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>
                   <Plus className="mr-2" size={16} />
                   Nouveau Lot
-                </Button>
+                </Button>*/}
               </div>
             </div>
 
@@ -271,7 +386,7 @@ const WorkflowPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Lots Actifs</p>
                         <p className="text-2xl font-bold text-blue-600">
-                          {productionBatches.filter(b => b.status === 'in_progress').length}
+                          {dashboardData?.in_progress_batches ?? dashboardData?.active_batches ?? productionBatches.filter(b => b.status === 'in_progress').length}
                         </p>
                       </div>
                       <Play className="w-8 h-8 text-blue-600" />
@@ -283,7 +398,7 @@ const WorkflowPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Lots Complétés</p>
                         <p className="text-2xl font-bold text-green-600">
-                          {productionBatches.filter(b => b.status === 'completed').length}
+                          {dashboardData?.completed_batches ?? productionBatches.filter(b => b.status === 'completed').length}
                         </p>
                       </div>
                       <CheckCircle className="w-8 h-8 text-green-600" />
@@ -295,10 +410,9 @@ const WorkflowPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Production Journalière</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {productionBatches
+                          {(dashboardData?.daily_production ?? productionBatches
                             .filter(b => b.status === 'completed' || b.status === 'in_progress')
-                            .reduce((sum, b) => sum + b.currentQuantity, 0)
-                            .toLocaleString()} kg
+                            .reduce((sum, b) => sum + b.currentQuantity, 0)).toLocaleString()} kg
                         </p>
                       </div>
                       <Target className="w-8 h-8 text-orange-600" />
@@ -309,13 +423,7 @@ const WorkflowPage: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-gray-600">Efficacité Moyenne</p>
-                        <p className="text-2xl font-bold text-purple-600">
-                          {(workflowSteps
-                            .filter(s => s.efficiency > 0)
-                            .reduce((sum, s) => sum + s.efficiency, 0) / 
-                            workflowSteps.filter(s => s.efficiency > 0).length
-                          ).toFixed(1)}%
-                        </p>
+                        <p className="text-2xl font-bold text-purple-600">{dashboardData?.current_efficiency ?? dashboardData?.current_efficiency ?? avgEfficiencyDisplay}%</p>
                       </div>
                       <TrendingUp className="w-8 h-8 text-purple-600" />
                     </div>
@@ -353,6 +461,23 @@ const WorkflowPage: React.FC = () => {
                               className="h-2 mt-2" 
                             />
                           )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+                {/* Recent Batches */}
+                <Card padding="lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Lots Récents</h3>
+                  <div className="space-y-2">
+                    {(dashboardData?.recent_batches || productionBatches.slice(0, 5) || []).map((b: any) => (
+                      <div key={b.id} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{b.batch_code || b.batchCode || b.batchCode}</p>
+                          <p className="text-sm text-gray-500">{b.product_type || b.productType || ''} — {formatDate(b.created_at || b.startDate || b.start || b.createdAt)}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={getStatusColor(b.status || b.status)} size="sm">{b.status || b.status}</Badge>
                         </div>
                       </div>
                     ))}
@@ -504,14 +629,7 @@ const WorkflowPage: React.FC = () => {
               <div className="space-y-6">
                 <Card padding="lg">
                   <h2 className="text-xl font-semibold text-gray-900 mb-6">Planification de Production</h2>
-                  <div className="text-center py-12 text-gray-500">
-                    <Calendar className="w-16 h-16 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Calendrier de Production</h3>
-                    <p>Interface de planification des lots de production</p>
-                    <Button variant="primary" className="mt-4">
-                      Ouvrir le Planificateur
-                    </Button>
-                  </div>
+                  <ProductionCalendar batches={(dashboardData?.recent_batches || productionBatches) as any} />
                 </Card>
               </div>
             )}
@@ -525,8 +643,15 @@ const WorkflowPage: React.FC = () => {
                     <Eye className="w-16 h-16 mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-2">Monitoring Live</h3>
                     <p>Surveillance en temps réel des flux de production</p>
-                    <Button variant="primary" className="mt-4">
-                      Démarrer le Monitoring
+                    <Button
+                      variant={isMonitoring ? 'secondary' : 'primary'}
+                      className="mt-4"
+                      onClick={() => {
+                        if (isMonitoring) stopMonitoring();
+                        else startMonitoring();
+                      }}
+                    >
+                      {isMonitoring ? 'Arrêter le Monitoring' : 'Démarrer le Monitoring'}
                     </Button>
                   </div>
                 </Card>
@@ -535,6 +660,54 @@ const WorkflowPage: React.FC = () => {
           </div>
         </main>
       </div>
+      <BatchWorkflowModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSave={async (createdBatch?: any) => {
+          // Optimistically add created batch so calendar updates immediately
+              if (createdBatch) {
+            try {
+              const mapped: ProductionBatch = {
+                id: String(createdBatch.id || createdBatch.batch_code || createdBatch.pk || ''),
+                batchCode: createdBatch.batch_code || createdBatch.batchCode || createdBatch.code || 'N/A',
+                productType: createdBatch.product_type || createdBatch.productType || createdBatch.product || 'Unknown',
+                status: (createdBatch.status || 'planned') as any,
+                priority: (createdBatch.priority || 'medium') as any,
+                startDate: createdBatch.start_date || createdBatch.startDate || createdBatch.start || new Date().toISOString(),
+                endDate: createdBatch.end_date || createdBatch.endDate || createdBatch.end || new Date().toISOString(),
+                progress: createdBatch.progress_percentage ?? createdBatch.progress ?? 0,
+                assignedTeam: createdBatch.assigned_team || createdBatch.team || '—',
+                supervisor: createdBatch.supervisor_name || createdBatch.supervisor || (createdBatch.supervisor?.username ?? '—'),
+                targetQuantity: createdBatch.target_quantity || createdBatch.targetQuantity || createdBatch.target || 0,
+                currentQuantity: createdBatch.current_quantity || createdBatch.currentQuantity || createdBatch.current || 0,
+                qualityScore: createdBatch.quality_score || createdBatch.qualityScore || createdBatch.quality || 0,
+                estimatedCompletion: createdBatch.estimated_completion || createdBatch.estimatedCompletion || createdBatch.end_date || new Date().toISOString(),
+                notes: createdBatch.notes || createdBatch.note || createdBatch.remarks || undefined,
+              };
+
+              setProductionBatches((prev: ProductionBatch[]) => [mapped, ...prev]);
+              setDashboardData((prev: any) => ({
+                ...(prev || {}),
+                recent_batches: [createdBatch, ...(prev?.recent_batches || [])]
+              }));
+            } catch (err) {
+              console.warn('Failed optimistic insert of created batch', err);
+            }
+          }
+
+          // Also refresh authoritative lists to ensure server state
+          await refreshBatches();
+          try {
+            const d = await workflowService.getWorkflowDashboard();
+            setDashboardData(d || null);
+          } catch (e) {
+            console.warn('Failed to refresh dashboard after create', e);
+          }
+
+          setShowCreateModal(false);
+        }}
+        batch={null}
+      />
     </div>
   );
 };

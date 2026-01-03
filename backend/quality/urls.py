@@ -10,6 +10,7 @@ from quality.views import (
     QualityStandardViewSet, 
     QualityMetricsViewSet,
     QualityReportView,
+    QualityAuditViewSet,
 )
 
 app_name = 'quality'
@@ -20,6 +21,7 @@ router.register(r'checks', QualityCheckViewSet, basename='quality-checks')
 router.register(r'standards', QualityStandardViewSet, basename='quality-standards')
 router.register(r'metrics', QualityMetricsViewSet, basename='quality-metrics')
 router.register(r'reports', QualityReportView, basename='quality-reports')
+router.register(r'audits', QualityAuditViewSet, basename='quality-audits')
 
 urlpatterns = [
     # Include all router URLs

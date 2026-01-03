@@ -8,6 +8,7 @@ from .quality_views import (
     QualityStandardViewSet,
     QualityMetricsViewSet,
     QualityReportView,
+    QualityAuditViewSet,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     'QualityStandardViewSet',
     'QualityMetricsViewSet',
     'QualityReportView',
+    'QualityAuditViewSet',
 ]

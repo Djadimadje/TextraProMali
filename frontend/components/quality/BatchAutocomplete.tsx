@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { workflowService } from '../../services/workflowService';
+import workflowService from '../../services/workflowService';
 
 interface BatchOption {
   id: string;

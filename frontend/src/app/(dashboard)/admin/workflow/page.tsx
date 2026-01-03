@@ -17,9 +17,10 @@ import {
 } from 'lucide-react';
 import Header from '../../../../../components/layout/Header';
 import AdminSidebar from '../../../../../components/layout/AdminSidebar';
-import { workflowService, BatchWorkflow, BatchWorkflowFilters, BatchWorkflowStats } from '../../../../../services/workflowService';
 import { useAuth } from '../../../../contexts/AuthContext';
 import { useActivityTracker } from '../../../../hooks/useActivityTracker';
+import workflowService from '../../../../../services/workflowService';
+import type { BatchWorkflow, BatchWorkflowStats, BatchFilters as BatchWorkflowFilters } from '../../../../types/api';
 
 const WorkflowPage: React.FC = () => {
   console.log('WorkflowPage component mounted');
@@ -128,13 +129,19 @@ const WorkflowPage: React.FC = () => {
       
       const response = await workflowService.getBatchWorkflows(filters);
       console.log('Workflow response:', response);
-      
-      if (response && response.success) {
+
+      // Support both wrapped responses ({ success, data }) and direct paginated responses
+      if (response && response.success && response.data) {
         setBatches(response.data.results || []);
-        console.log('Batches loaded:', response.data.results);
+        console.log('Batches loaded (wrapped):', response.data.results);
+      } else if (response && (Array.isArray((response as any).results) || (response as any).results)) {
+        // Direct paginated response
+        const paginated = response as any;
+        setBatches(paginated.results || []);
+        console.log('Batches loaded (direct):', paginated.results);
       } else {
-        console.log('Response structure:', response);
-        setError(response?.message || 'Failed to load batch workflows');
+        console.log('Response structure unexpected:', response);
+        setError((response && (response as any).message) || 'Failed to load batch workflows');
       }
     } catch (err) {
       console.error('Failed to load batch workflows:', err);
@@ -362,12 +369,16 @@ const WorkflowPage: React.FC = () => {
     setCreating(true);
     try {
       const response = await workflowService.createBatchWorkflow(batchData);
-      if (response.success) {
+      // api.createBatch/createBatchWorkflow may return either a wrapped response ({ success, data })
+      // or the created BatchWorkflow object directly. Treat both as success when a batch object is returned.
+      const createdBatch = (response && (response as any).data) ? (response as any).data : response;
+      if (createdBatch && (createdBatch.id || createdBatch.batch_code)) {
         setShowCreateModal(false);
         loadBatchWorkflows(); // Refresh the data
         loadStats();
       } else {
-        setError(response.message || 'Failed to create batch');
+        // Try to surface a message if present
+        setError((response as any).message || 'Failed to create batch');
       }
     } catch (err: any) {
       // Log both the raw object and a JSON-stringified snapshot for clarity

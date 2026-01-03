@@ -21,6 +21,7 @@ import {
   MachineUpdateData,
   MachineType
 } from '../../../../../services/machineService';
+import api from '../../../../services/api';
 
 interface User {
   id: string;
@@ -38,7 +39,6 @@ const MachinesPage: React.FC = () => {
   useActivityTracker();
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  
   const [machines, setMachines] = useState<Machine[]>([]);
   const [machineStats, setMachineStats] = useState<MachineStats | null>(null);
   const [machineTypes, setMachineTypes] = useState<MachineType[]>([]);
@@ -283,6 +283,23 @@ const MachinesPage: React.FC = () => {
     setShowCreateModal(true);
   };
 
+  const handleAddMachineType = async () => {
+    // Simple prompt-based flow for adding a machine type
+    const name = typeof window !== 'undefined' ? window.prompt('Enter new machine type name:') : null;
+    if (!name) return;
+
+    try {
+      const payload = { name };
+      await api.post('/machines/machine-types/', payload);
+      showNotification('Machine type created successfully!', 'success');
+      // Reload machine types
+      await loadMachineData();
+    } catch (err: any) {
+      console.error('Error creating machine type:', err);
+      showNotification(`Error creating machine type: ${err?.message || 'Unknown error'}`, 'error');
+    }
+  };
+
   const handleEditMachine = (machine: Machine) => {
     setSelectedMachine(machine);
     setShowEditModal(true);
@@ -520,6 +537,7 @@ const MachinesPage: React.FC = () => {
               setOperatorFilter={setOperatorFilter}
               onExportMachines={handleExportMachines}
               onAddMachine={handleAddMachine}
+              onAddMachineType={handleAddMachineType}
               onRefresh={handleRefresh}
               machineTypes={machineTypes.map(mt => mt.name)}
               locations={['Building A', 'Building B', 'Building C']}

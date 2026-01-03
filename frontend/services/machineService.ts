@@ -95,6 +95,7 @@ export interface MachineFilters {
   building?: string;
   site_code?: string;
   maintenance_due?: boolean;
+  created_by_role?: string;
   ordering?: string;
   page?: number;
   page_size?: number;

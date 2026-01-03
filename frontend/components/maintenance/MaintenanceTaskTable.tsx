@@ -43,11 +43,24 @@ const MaintenanceTaskTable: React.FC<MaintenanceTaskTableProps> = ({
     search: ''
   });
 
+  // Local input state to allow typing/deleting without triggering API on every keystroke
+  const [searchInput, setSearchInput] = useState(filters.search);
+
   const pageSize = 10;
 
+  // Load tasks when page, filters (including debounced search) or refresh trigger change
   useEffect(() => {
     loadTasks();
   }, [currentPage, filters, refreshTrigger]);
+
+  // Debounce search input and update filters.search after a short delay
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }));
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   const loadTasks = async () => {
     try {
@@ -73,8 +86,9 @@ const MaintenanceTaskTable: React.FC<MaintenanceTaskTableProps> = ({
       
       if (response.success && response.data) {
         setTasks(response.data);
-        setTotalTasks(response.data.length);
-        setTotalPages(Math.ceil(response.data.length / pageSize));
+        const count = (response.count ?? response.data.length) as number;
+        setTotalTasks(count);
+        setTotalPages(Math.max(1, Math.ceil(count / pageSize)));
       }
     } catch (err) {
       console.error('Failed to load maintenance tasks:', err);
@@ -164,30 +178,7 @@ const MaintenanceTaskTable: React.FC<MaintenanceTaskTableProps> = ({
     return task.status === 'pending' && daysSinceReported > 1;
   };
 
-  if (loading) {
-    return (
-      <Card padding="lg">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-gray-600">Loading maintenance tasks...</span>
-        </div>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card padding="lg">
-        <div className="text-center py-12">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button variant="secondary" onClick={loadTasks}>
-            Try Again
-          </Button>
-        </div>
-      </Card>
-    );
-  }
+  // Keep header and search visible during loading/errors to avoid unmounting input
 
   return (
     <Card padding="none">
@@ -205,8 +196,8 @@ const MaintenanceTaskTable: React.FC<MaintenanceTaskTableProps> = ({
               <input
                 type="text"
                 placeholder="Search tasks..."
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="w-full sm:w-64 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>

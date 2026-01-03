@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { formatCurrency } from '../../../../../../lib/formatters';
+import { formatCurrency } from '../../../../../lib/formatters';
 import { useAuth } from '../../../../contexts/AuthContext';
 import TechnicianSidebar from '../../../../../components/layout/TechnicianSidebar';
 import Header from '../../../../../components/layout/Header';

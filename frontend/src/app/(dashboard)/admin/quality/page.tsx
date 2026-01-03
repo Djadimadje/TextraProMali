@@ -9,13 +9,11 @@ import QualityDashboard from '../../../../../components/quality/QualityDashboard
 import RecentChecks from '../../../../../components/quality/RecentChecks';
 import QualityAlerts from '../../../../../components/quality/QualityAlerts';
 import QualityChecks from '../../../../../components/quality/QualityChecks';
-import ImageUpload from '../../../../../components/quality/ImageUpload';
 import QualityStandards from '../../../../../components/quality/QualityStandards';
 import { 
   XCircle,
   AlertTriangle, 
   FileText,
-  Upload,
   RefreshCw,
   BarChart3,
   CheckCircle
@@ -175,7 +173,6 @@ const QualityPage: React.FC = () => {
                 {[
                   { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
                   { id: 'checks', name: 'Quality Checks', icon: CheckCircle },
-                  { id: 'upload', name: 'Upload Images', icon: Upload },
                   { id: 'standards', name: 'Standards', icon: FileText }
                 ].map((tab) => (
                   <button
@@ -223,17 +220,7 @@ const QualityPage: React.FC = () => {
               />
             )}
 
-            {/* Upload Images Tab */}
-            {activeTab === 'upload' && (
-              <ImageUpload 
-                onCheckCompleted={(result) => {
-                  console.log('Quality check completed:', result);
-                  // Reload data when image analysis is completed
-                  loadDashboardData();
-                  loadQualityChecks();
-                }}
-              />
-            )}
+            {/* Upload Images tab removed per request */}
 
             {/* Quality Standards Tab */}
             {activeTab === 'standards' && <QualityStandards />}

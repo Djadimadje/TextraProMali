@@ -303,6 +303,56 @@ class AllocationService {
     return this.handleResponse<AllocationStats>(response);
   }
 
+  // Allocation analytics (overview)
+  async getAllocationAnalytics(): Promise<ApiResponse<any>> {
+    const response = await fetch(`${BASE_URL}/analytics/allocation/`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    return this.handleResponse<any>(response);
+  }
+
+  // Convenience helpers returning plain lists for UI pages
+  async getWorkforceAllocationsList(params?: {
+    batch?: string;
+    user?: string;
+    role_assigned?: string;
+    date_from?: string;
+    date_to?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<WorkforceAllocation[]> {
+    try {
+      const resp = await this.getWorkforceAllocations(params);
+      if (resp.success && resp.data && (resp.data as any).results) return (resp.data as any).results as WorkforceAllocation[];
+      if (resp.success && resp.data) return resp.data as unknown as WorkforceAllocation[];
+      return [] as WorkforceAllocation[];
+    } catch (err) {
+      console.error('getWorkforceAllocationsList error', err);
+      return [] as WorkforceAllocation[];
+    }
+  }
+
+  async getMaterialAllocationsList(params?: {
+    batch?: string;
+    material_name?: string;
+    unit?: string;
+    supplier?: string;
+    page?: number;
+    page_size?: number;
+  }): Promise<MaterialAllocation[]> {
+    try {
+      const resp = await this.getMaterialAllocations(params);
+      if (resp.success && resp.data && (resp.data as any).results) return (resp.data as any).results as MaterialAllocation[];
+      if (resp.success && resp.data) return resp.data as unknown as MaterialAllocation[];
+      return [] as MaterialAllocation[];
+    } catch (err) {
+      console.error('getMaterialAllocationsList error', err);
+      return [] as MaterialAllocation[];
+    }
+  }
+
   // Material Allocation Methods
   async getMaterialAllocations(params?: {
     batch?: string;

@@ -29,6 +29,7 @@ const UserManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState(searchTerm);
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
@@ -242,6 +243,14 @@ const UserManagementPage: React.FC = () => {
     }
   }, [searchTerm, roleFilter, statusFilter, departmentFilter, user]);
 
+  // Debounce local input to avoid triggering load on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   const handleExportUsers = () => {
     setShowExportModal(true);
   };
@@ -278,26 +287,7 @@ const UserManagementPage: React.FC = () => {
 
   const departments = Array.from(new Set(users.map(u => u.department).filter(Boolean))) as string[];
 
-  if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  // Render page even while loading or when an error exists so inputs remain mounted
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -321,8 +311,8 @@ const UserManagementPage: React.FC = () => {
             
             {/* Search and Filters */}
             <SearchAndFilters
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
+              searchTerm={searchInput}
+              setSearchTerm={setSearchInput}
               roleFilter={roleFilter}
               setRoleFilter={setRoleFilter}
               statusFilter={statusFilter}
@@ -334,6 +324,22 @@ const UserManagementPage: React.FC = () => {
               onRefresh={handleRefresh}
               departments={departments}
             />
+
+            {/* Inline loading / error so the search input remains mounted */}
+            {(authLoading || loading) && (
+              <div className="w-full py-4 text-center text-sm text-gray-600">
+                <div className="inline-flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-600"></div>
+                  Loading user data...
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="w-full py-2 text-center text-sm text-red-600">
+                {error}
+              </div>
+            )}
             
             {/* User Table */}
             <UserTable 

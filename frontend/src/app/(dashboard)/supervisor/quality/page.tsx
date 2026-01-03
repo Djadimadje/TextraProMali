@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { qualityService } from '../../../../../services/qualityService';
 import { useAuth } from '../../../../contexts/AuthContext';
 import SupervisorSidebar from '../../../../../components/layout/SupervisorSidebar';
 import Header from '../../../../../components/layout/Header';
@@ -32,6 +33,9 @@ import {
   Layers,
   Clipboard
 } from 'lucide-react';
+import { BatchWorkflow } from '@/types/api';
+import workflowService from '../../../../../services/workflowService';
+import api from '@/services/api';
 
 interface QualityMetric {
   id: string;
@@ -108,7 +112,7 @@ const QualityPage: React.FC = () => {
     { id: 'QM006', name: 'Coût Qualité', value: 2.3, target: 3, unit: '%', trend: 'down', status: 'good', lastUpdate: '2025-01-26 08:30' }
   ];
 
-  const qualityIssues: QualityIssue[] = [
+  const [qualityIssuesState, setQualityIssuesState] = useState<QualityIssue[]>([
     {
       id: 'QI001',
       batchId: 'BATCH-2025-0892',
@@ -148,9 +152,34 @@ const QualityPage: React.FC = () => {
       status: 'open',
       impact: 7
     }
-  ];
+    ]);
 
-  const qualityAudits: QualityAudit[] = [
+    type NewCheck = {
+      batch: string;
+      image: File | null;
+      defect_detected: boolean;
+      defect_type: string;
+      severity: 'low'|'medium'|'high';
+      comments: string;
+      ai_analysis_requested: boolean;
+    };
+
+    const DEFAULT_NEW_CHECK: NewCheck = {
+      batch: '',
+      image: null,
+      defect_detected: false,
+      defect_type: '',
+      severity: 'low',
+      comments: '',
+      ai_analysis_requested: false
+    };
+
+    const [showNewCheck, setShowNewCheck] = useState(false);
+    const [newCheck, setNewCheck] = useState<NewCheck>(DEFAULT_NEW_CHECK);
+    const [submitting, setSubmitting] = useState(false);
+    const [batches, setBatches] = useState<BatchWorkflow[]>([]);
+
+  const [qualityAudits, setQualityAudits] = useState<QualityAudit[]>([
     {
       id: 'QA001',
       type: 'routine',
@@ -184,7 +213,54 @@ const QualityPage: React.FC = () => {
       findings: 0,
       recommendations: 0
     }
-  ];
+  ]);
+
+  // Load quality checks from backend on mount so they persist across refreshes
+  useEffect(() => {
+    let mounted = true;
+    const loadChecks = async () => {
+      try {
+        const resp = await qualityService.getQualityChecks({ page_size: 50 });
+        // qualityService returns ApiResponse<PaginatedResponse<QualityCheck>>
+        const list = (resp && resp.data && (resp.data.results || resp.data)) || [];
+        if (mounted && Array.isArray(list)) {
+          // Map backend shape to local QualityIssue if necessary
+          const mapped = list.map((item: any) => ({
+            id: item.id || item.pk || String(Math.random()),
+            batchId: item.batch?.batch_code || item.batch_code || item.batch || '',
+            productName: item.batch?.product_type || item.productName || item.product_type || '',
+            issueType: item.defect_detected ? 'defect' : 'measurement',
+            severity: item.severity || 'low',
+            description: item.comments || item.description || '',
+            detectedBy: item.inspector?.display_name || item.inspector?.username || item.reported_by || '',
+            detectedAt: item.created_at || item.detectedAt || new Date().toISOString(),
+            status: item.status || 'pending',
+            assignedTo: item.assigned_to || item.assignedTo || undefined,
+            resolution: item.resolution || undefined,
+            impact: item.impact || 0
+          } as QualityIssue));
+
+          setQualityIssuesState(mapped);
+        }
+      } catch (err) {
+        console.error('Failed to load quality checks on mount', err);
+      }
+    };
+
+    loadChecks();
+    return () => { mounted = false; };
+  }, []);
+
+  const [showScheduleAudit, setShowScheduleAudit] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState<Partial<QualityAudit>>({
+    type: 'routine',
+    auditor: user?.first_name ? `${user.first_name} ${user.last_name}` : '',
+    date: '',
+    areas: [],
+    score: 0,
+    status: 'scheduled'
+  });
 
   const productionBatches: ProductionBatch[] = [
     {
@@ -241,6 +317,22 @@ const QualityPage: React.FC = () => {
     }
   };
 
+  // Normalize backend QualityCheck objects to the local QualityIssue shape
+  const normalizeToQualityIssue = (item: any): QualityIssue => ({
+    id: item.id || item.pk || String(Math.random()),
+    batchId: item.batch?.batch_code || item.batch_code || item.batch || '',
+    productName: item.batch?.product_type || item.productName || item.product_type || '',
+    issueType: item.defect_detected ? 'defect' : (item.issueType || 'measurement'),
+    severity: item.severity || 'low',
+    description: item.comments || item.description || '',
+    detectedBy: item.inspector?.display_name || item.inspector?.username || item.detectedBy || item.reported_by || '',
+    detectedAt: item.created_at || item.detectedAt || new Date().toISOString(),
+    status: item.status || 'open',
+    assignedTo: item.assigned_to || item.assignedTo || undefined,
+    resolution: item.resolution || undefined,
+    impact: item.impact || 0
+  });
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'low': return 'success';
@@ -274,6 +366,45 @@ const QualityPage: React.FC = () => {
     return <div>Access denied.</div>;
   }
 
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        // try getting the user's batches first
+        const my = await workflowService.getMyBatches();
+        console.log('workflow.getMyBatches ->', my);
+        if (mounted && Array.isArray(my) && my.length) {
+          console.log('Using my_batches array, count=', my.length);
+          setBatches(my as any);
+          return;
+        }
+        console.log('my_batches not an array or empty, will try getBatches()');
+
+        // fallback to paginated list
+        const res = await workflowService.getBatches();
+        console.log('workflow.getBatches ->', res);
+        if (mounted && res) {
+          const list = (res as any).results || (res as any).data || (res as any);
+          console.log('Derived list from getBatches, type=', Array.isArray(list) ? 'array' : typeof list, 'length=', Array.isArray(list) ? list.length : 'n/a');
+          if (Array.isArray(list) && list.length) setBatches(list);
+          
+        }
+      } catch (err) {
+        console.error('Failed loading batches for quality dropdown', err);
+      }
+    };
+
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  // Preselect first backend batch when opening the New Check modal
+  useEffect(() => {
+    if (showNewCheck && batches.length > 0 && !newCheck.batch) {
+      setNewCheck(prev => ({ ...prev, batch: batches[0].batch_code }));
+    }
+  }, [showNewCheck, batches]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
@@ -293,16 +424,133 @@ const QualityPage: React.FC = () => {
               </div>
               
               <div className="flex gap-3">
-                <Button variant="secondary" size="sm">
-                  <Download className="mr-2" size={16} />
-                  Rapport
-                </Button>
-                <Button variant="primary" size="sm">
+                <Button variant="primary" size="sm" onClick={() => setShowNewCheck(true)}>
                   <Plus className="mr-2" size={16} />
                   Nouveau Contrôle
                 </Button>
+                <div className="flex items-center pl-2">
+                  <Badge variant="default" size="sm">Lots backend: {batches.length}</Badge>
+                </div>
               </div>
             </div>
+            
+
+            {/* New Quality Check Modal */}
+            {showNewCheck && (
+              <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+                  <h3 className="text-lg font-semibold mb-4">Nouveau Contrôle Qualité</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label htmlFor="newcheck-batch" className="block text-sm text-gray-700 mb-1">Code du lot</label>
+                      <select id="newcheck-batch" name="batch" value={newCheck.batch} onChange={e => setNewCheck(prev => ({...prev, batch: e.target.value}))} className="w-full px-3 py-2 border rounded-lg">
+                        <option value="">Sélectionner un lot...</option>
+                        {batches.length > 0 ? (
+                          batches.map(b => (
+                            <option key={b.id} value={b.batch_code}>{b.batch_code}{b.batch_number ? ` — ${b.batch_number}` : ''}{b.product_type ? ` — ${b.product_type}` : ''}</option>
+                          ))
+                        ) : (
+                          <option value="" disabled>Aucun lot disponible</option>
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="newcheck-image" className="block text-sm text-gray-700 mb-1">Image</label>
+                      <input id="newcheck-image" name="image" type="file" accept="image/*" onChange={e => setNewCheck(prev => ({...prev, image: e.target.files?.[0] || null}))} />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <label htmlFor="newcheck-defect" className="flex items-center gap-2">
+                        <input id="newcheck-defect" name="defect_detected" type="checkbox" checked={newCheck.defect_detected} onChange={e => setNewCheck(prev => ({...prev, defect_detected: e.target.checked}))} />
+                        <span className="text-sm text-gray-700">Défaut détecté</span>
+                      </label>
+                      <label htmlFor="newcheck-ai" className="flex items-center gap-2">
+                        <input id="newcheck-ai" name="ai_analysis_requested" type="checkbox" checked={newCheck.ai_analysis_requested} onChange={e => setNewCheck(prev => ({...prev, ai_analysis_requested: e.target.checked}))} />
+                        <span className="text-sm text-gray-700">Analyser avec IA</span>
+                      </label>
+                    </div>
+
+                    {newCheck.defect_detected && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="newcheck-defect-type" className="block text-sm text-gray-700 mb-1">Type de défaut</label>
+                          <input id="newcheck-defect-type" name="defect_type" type="text" value={newCheck.defect_type} onChange={e => setNewCheck(prev => ({...prev, defect_type: e.target.value}))} className="w-full px-3 py-2 border rounded-lg" />
+                        </div>
+                        <div>
+                          <label htmlFor="newcheck-severity" className="block text-sm text-gray-700 mb-1">Gravité</label>
+                          <select id="newcheck-severity" name="severity" value={newCheck.severity} onChange={e => setNewCheck(prev => ({...prev, severity: e.target.value as any}))} className="w-full px-3 py-2 border rounded-lg">
+                            <option value="low">Faible</option>
+                            <option value="medium">Moyenne</option>
+                            <option value="high">Haute</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label htmlFor="newcheck-comments" className="block text-sm text-gray-700 mb-1">Commentaires</label>
+                      <textarea id="newcheck-comments" name="comments" value={newCheck.comments} onChange={e => setNewCheck(prev => ({...prev, comments: e.target.value}))} className="w-full px-3 py-2 border rounded-lg" rows={3} />
+                    </div>
+
+                    <div className="flex gap-3 justify-end pt-4">
+                      <button type="button" onClick={() => { setShowNewCheck(false); setNewCheck(DEFAULT_NEW_CHECK); }} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700">Annuler</button>
+                      <button type="button" disabled={submitting} onClick={async () => {
+                        // basic validation
+                        if (!newCheck.batch.trim()) { alert('Le code du lot est requis'); return; }
+                        if (!newCheck.image) { alert('Une image est requise'); return; }
+                        if (newCheck.defect_detected && !newCheck.defect_type.trim()) { alert('Le type de défaut est requis lorsque un défaut est détecté'); return; }
+
+                        try {
+                          setSubmitting(true);
+                          const payload = {
+                            batch: newCheck.batch,
+                            image: newCheck.image!,
+                            defect_detected: newCheck.defect_detected,
+                            defect_type: newCheck.defect_type || undefined,
+                            severity: newCheck.severity || undefined,
+                            comments: newCheck.comments || undefined,
+                            ai_analysis_requested: newCheck.ai_analysis_requested || undefined
+                          } as any;
+
+                          const resp = await qualityService.createQualityCheck(payload);
+
+                          // Normalize created object from different service shapes
+                          let created: any = null;
+                          if (!resp) created = null;
+                          else if (resp.data) created = resp.data;
+                          else created = resp;
+
+                          if (created && (created.id || created.pk)) {
+                            const normalized = normalizeToQualityIssue(created);
+                            setQualityIssuesState(prev => [normalized, ...prev]);
+                          } else {
+                            // Fallback: reload recent checks from API and prepend newest
+                            try {
+                              const recent = await qualityService.getQualityChecks({ page_size: 10 });
+                              const list = (recent && recent.data && (recent.data.results || recent.data)) || [];
+                              if (Array.isArray(list) && list.length) {
+                                const mapped = list.map((i: any) => normalizeToQualityIssue(i));
+                                setQualityIssuesState(prev => [...mapped, ...prev]);
+                              }
+                            } catch (reloadErr) {
+                              console.error('Failed to reload recent checks after create', reloadErr);
+                            }
+                          }
+
+                          setShowNewCheck(false);
+                          setNewCheck(DEFAULT_NEW_CHECK);
+                        } catch (err: any) {
+                          alert('Échec de création: ' + (err.message || String(err)));
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }} className="px-4 py-2 bg-blue-600 text-white rounded-lg">{submitting ? 'Enregistrement...' : 'Enregistrer'}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Navigation Tabs */}
             <div className="border-b border-gray-200 mb-6">
@@ -350,7 +598,7 @@ const QualityPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-medium text-gray-600">Problèmes Ouverts</p>
                         <p className="text-2xl font-bold text-orange-600">
-                          {qualityIssues.filter(issue => issue.status === 'open').length}
+                          {qualityIssuesState.filter(issue => issue.status === 'open').length}
                         </p>
                       </div>
                       <AlertTriangle className="w-8 h-8 text-orange-600" />
@@ -387,7 +635,7 @@ const QualityPage: React.FC = () => {
                   <Card padding="lg">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Problèmes Récents</h3>
                     <div className="space-y-3">
-                      {qualityIssues.slice(0, 3).map((issue) => (
+                      {qualityIssuesState.slice(0, 3).map((issue) => (
                         <div key={issue.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                           <div className="flex items-center gap-3">
                             {getIssueTypeIcon(issue.issueType)}
@@ -494,7 +742,7 @@ const QualityPage: React.FC = () => {
                   </div>
                   
                   <div className="grid gap-4">
-                    {qualityIssues.map((issue) => (
+                    {qualityIssuesState.map((issue) => (
                       <div key={issue.id} className="p-4 border border-gray-200 rounded-lg">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-start gap-3">
@@ -564,13 +812,76 @@ const QualityPage: React.FC = () => {
             {activeTab === 'audits' && (
               <div className="space-y-6">
                 <Card padding="lg">
-                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-semibold text-gray-900">Audits Qualité</h2>
-                    <Button variant="primary" size="sm">
+                    <Button variant="primary" size="sm" onClick={() => setShowScheduleAudit(true)}>
                       <Plus className="mr-2" size={16} />
                       Planifier Audit
                     </Button>
                   </div>
+
+                  {showScheduleAudit && (
+                    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+                      <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+                        <h3 className="text-lg font-semibold mb-4">Planifier un Audit</h3>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm text-gray-700 mb-1">Type d'audit</label>
+                            <select value={scheduleForm.type} onChange={e => setScheduleForm(prev => ({...prev, type: e.target.value as any}))} className="w-full px-3 py-2 border rounded-lg">
+                              <option value="routine">Routine</option>
+                              <option value="special">Spécial</option>
+                              <option value="customer">Client</option>
+                              <option value="certification">Certification</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm text-gray-700 mb-1">Auditeur</label>
+                            <input type="text" value={scheduleForm.auditor || ''} onChange={e => setScheduleForm(prev => ({...prev, auditor: e.target.value}))} className="w-full px-3 py-2 border rounded-lg" />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm text-gray-700 mb-1">Date</label>
+                            <input type="date" value={scheduleForm.date || ''} onChange={e => setScheduleForm(prev => ({...prev, date: e.target.value}))} className="w-full px-3 py-2 border rounded-lg" />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm text-gray-700 mb-1">Zones (séparées par des virgules)</label>
+                            <input type="text" value={(scheduleForm.areas || []).join(', ')} onChange={e => setScheduleForm(prev => ({...prev, areas: e.target.value.split(',').map(s => s.trim()).filter(Boolean)}))} className="w-full px-3 py-2 border rounded-lg" placeholder="Production, Contrôle Qualité" />
+                          </div>
+
+                          <div className="flex gap-3 justify-end pt-4">
+                            <button type="button" onClick={() => { setShowScheduleAudit(false); setScheduleForm({}); }} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700">Annuler</button>
+                            <button type="button" onClick={async () => {
+                              if (!scheduleForm.date || !scheduleForm.auditor) { alert('Auditeur et date requis'); return; }
+                              try {
+                                setScheduling(true);
+
+                                const payload = {
+                                  audit_type: scheduleForm.type || 'routine',
+                                  auditor: scheduleForm.auditor,
+                                  date: scheduleForm.date,
+                                  areas: scheduleForm.areas || [],
+                                  status: 'scheduled'
+                                } as any;
+
+                                const resp = await api.createQualityAudit(payload);
+                                // API returns created audit — prepend to list
+                                setQualityAudits(prev => [resp, ...prev]);
+                                setShowScheduleAudit(false);
+                                setScheduleForm({});
+                              } catch (err: any) {
+                                console.error('Failed to schedule audit', err);
+                                alert('Échec lors de la planification: ' + (err?.message || err?.response?.data?.error || String(err)));
+                              } finally {
+                                setScheduling(false);
+                              }
+                            }} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Planifier</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="grid gap-4">
                     {qualityAudits.map((audit) => (
@@ -659,77 +970,59 @@ const QualityPage: React.FC = () => {
                   </div>
                   
                   <div className="grid gap-4">
-                    {productionBatches.map((batch) => (
+                    {(batches.length ? batches : productionBatches).map((batch: any) => (
                       <div key={batch.id} className="p-4 border border-gray-200 rounded-lg">
                         <div className="flex items-start justify-between mb-4">
                           <div>
-                            <h4 className="font-medium text-gray-900">{batch.productName}</h4>
-                            <p className="text-sm text-gray-600">{batch.id}</p>
+                            <h4 className="font-medium text-gray-900">{(batch.product_type || batch.productName || batch.description) ?? batch.batch_code ?? batch.id}</h4>
+                            <p className="text-sm text-gray-600">{batch.batch_code ?? batch.id}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant={getStatusColor(batch.status) as any} size="sm">
                               {batch.status}
                             </Badge>
-                            <Badge variant="success" size="sm">
-                              Score: {batch.qualityScore}
-                            </Badge>
+                            {batch.progress_percentage !== undefined && (
+                              <Badge variant="success" size="sm">Progress: {Math.round(batch.progress_percentage)}%</Badge>
+                            )}
                           </div>
                         </div>
-                        
+
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                           <div>
-                            <span className="text-xs text-gray-600">Quantité:</span>
-                            <p className="text-sm font-medium">{batch.quantity.toLocaleString()} m</p>
+                            <span className="text-xs text-gray-600">Produit:</span>
+                            <p className="text-sm font-medium">{batch.product_type || batch.productName || '-'}</p>
                           </div>
                           <div>
-                            <span className="text-xs text-gray-600">Taux de défauts:</span>
-                            <p className="text-sm font-medium">{batch.defectRate}%</p>
+                            <span className="text-xs text-gray-600">Superviseur:</span>
+                            <p className="text-sm font-medium">{batch.supervisor_name || batch.inspector || '-'}</p>
                           </div>
                           <div>
-                            <span className="text-xs text-gray-600">Inspecteur:</span>
-                            <p className="text-sm font-medium">{batch.inspector}</p>
+                            <span className="text-xs text-gray-600">Début:</span>
+                            <p className="text-sm font-medium">{batch.start_date ? new Date(batch.start_date).toLocaleDateString('fr-FR') : '-'}</p>
                           </div>
                           <div>
-                            <span className="text-xs text-gray-600">Complété le:</span>
-                            <p className="text-sm font-medium">
-                              {new Date(batch.completedAt).toLocaleDateString('fr-FR')}
-                            </p>
+                            <span className="text-xs text-gray-600">Fin prévue:</span>
+                            <p className="text-sm font-medium">{batch.end_date ? new Date(batch.end_date).toLocaleDateString('fr-FR') : '-'}</p>
                           </div>
                         </div>
-                        
-                        <div className="mb-4">
-                          <h5 className="text-sm font-medium text-gray-900 mb-2">Résultats des Tests</h5>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {Object.entries(batch.testResults).map(([test, score]) => (
-                              <div key={test} className="text-center">
-                                <p className="text-xs text-gray-600 capitalize">{test}</p>
-                                <p className="text-sm font-medium">{score}%</p>
-                                <div className="w-full mt-1">
-                                  <ProgressBar 
-                                    value={score} 
-                                    variant={score >= 90 ? 'success' : score >= 80 ? 'warning' : 'danger'} 
-                                    className="h-1" 
-                                  />
-                                </div>
-                              </div>
-                            ))}
+
+                        {batch.progress_percentage !== undefined && (
+                          <div className="mb-4">
+                            <h5 className="text-sm font-medium text-gray-900 mb-2">Progression</h5>
+                            <ProgressBar value={batch.progress_percentage} className="h-2" />
                           </div>
-                        </div>
-                        
+                        )}
+
                         <div className="flex justify-end gap-2">
                           <Button variant="secondary" size="sm">
                             <Eye className="mr-2" size={16} />
                             Détails
                           </Button>
-                          {batch.status === 'testing' && (
-                            <Button variant="primary" size="sm">
-                              Valider
-                            </Button>
+                          {(batch.status === 'testing' || batch.status === 'in_progress') && (
+                            <Button variant="primary" size="sm">Valider</Button>
                           )}
                           {batch.status === 'rework' && (
-                            <Button variant="warning" size="sm">
-                              Reprendre
-                            </Button>
+                            <Button variant="warning" size="sm">Reprendre</Button>
                           )}
                         </div>
                       </div>

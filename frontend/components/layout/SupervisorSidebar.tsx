@@ -29,7 +29,7 @@ const SupervisorSidebar: React.FC<SupervisorSidebarProps> = ({ className = '' })
     { key: 'quality', label: 'Quality Control', href: '/supervisor/quality', icon: 'CheckCircle', description: 'Quality monitoring' },
     { key: 'analytics', label: 'Analytics', href: '/supervisor/analytics', icon: 'BarChart', description: 'Production KPIs' },
     { key: 'reports', label: 'Reports', href: '/supervisor/reports', icon: 'FileText', description: 'Supervisor reports' },
-    { key: 'notifications', label: 'Notifications', href: '/supervisor/notifications', icon: 'Bell', description: 'Alerts & updates' }
+    
   ];
 
   const getIcon = (iconName: string) => {

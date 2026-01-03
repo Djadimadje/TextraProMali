@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import SupervisorSidebar from '../../../../components/layout/SupervisorSidebar';
 import Header from '../../../../components/layout/Header';
 import Card from '../../../../components/ui/Card';
@@ -15,6 +16,8 @@ const SupervisorDashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const { isLoading: dataLoading, withLoading } = useLoading();
   const { isLoading: actionLoading, withLoading: withActionLoading } = useLoading();
+
+  const router = useRouter();
 
   // Simulate data loading
   useEffect(() => {
@@ -133,11 +136,27 @@ const SupervisorDashboard: React.FC = () => {
 
   const handleQuickAction = async (action: string) => {
     await withActionLoading(async () => {
-      // Simulate action
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log(`Executing: ${action}`);
+      try {
+        switch (action) {
+          case 'Rapport de Production':
+            return router.push('http://localhost:3000/supervisor/reports');
+          case 'Gérer les Équipes':
+            return router.push('http://localhost:3000/supervisor/allocation');
+          case 'Planifier Maintenance':
+            return router.push('/dashboard/technician/maintenance');
+          case 'Envoyer Notification':
+            return router.push('/dashboard/technician/notifications');
+          default:
+            console.warn('Unknown quick action', action);
+            return;
+        }
+      } catch (err) {
+        console.error('Failed to execute quick action', action, err);
+      }
     });
   };
+
+  
 
   if (!mounted) {
     return null; // Prevent hydration issues
@@ -341,24 +360,7 @@ const SupervisorDashboard: React.FC = () => {
                     >
                       👥 Gérer les Équipes
                     </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      fullWidth
-                      disabled={actionLoading}
-                      onClick={() => handleQuickAction('Planifier Maintenance')}
-                    >
-                      📋 Planifier Maintenance
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      size="sm" 
-                      fullWidth
-                      disabled={actionLoading}
-                      onClick={() => handleQuickAction('Envoyer Notification')}
-                    >
-                      🔔 Envoyer Notification
-                    </Button>
+                    {/* Removed: Planifier Maintenance and Envoyer Notification quick actions */}
                   </div>
                 </Card>
               </div>

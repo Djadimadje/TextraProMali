@@ -23,7 +23,6 @@ const TechnicianSidebar: React.FC<TechnicianSidebarProps> = ({ className = '' })
     { key: 'dashboard', label: 'Dashboard', href: '/technician', icon: 'LayoutDashboard', description: 'Technician overview' },
     { key: 'machines', label: 'Machines', href: '/technician/machines', icon: 'Cog', description: 'Monitor assigned machines' },
     { key: 'maintenance', label: 'Maintenance', href: '/technician/maintenance', icon: 'Wrench', description: 'Schedule & log maintenance' },
-    { key: 'notifications', label: 'Notifications', href: '/technician/notifications', icon: 'Bell', description: 'Maintenance alerts' }
   ];
 
   const getIcon = (iconName: string) => {

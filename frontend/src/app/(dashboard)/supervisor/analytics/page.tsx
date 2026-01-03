@@ -7,7 +7,7 @@ import Card from '../../../../../components/ui/Card';
 import Button from '../../../../../components/ui/Button';
 import Badge from '../../../../../components/ui/Badge';
 import ProgressBar from '../../../../../components/ui/ProgressBar';
-import { 
+import {
   BarChart3,
   Plus,
   Download,
@@ -33,6 +33,23 @@ import {
   ArrowDownRight,
   Minus
 } from 'lucide-react';
+
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip
+} from 'recharts';
+import ExportService from '../../../../../services/exportService';
+import AnalyticsService from '@/services/analyticsService';
+
+
+// Colors for category bars
+const categoryColors = ['#8B5CF6', '#10B981', '#3B82F6', '#F59E0B'];
 
 interface KPI {
   id: string;
@@ -83,6 +100,8 @@ interface CostAnalysis {
 const AnalyticsPage: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'production' | 'performance' | 'costs' | 'trends'>('overview');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('month');
 
@@ -125,6 +144,32 @@ const AnalyticsPage: React.FC = () => {
     { id: 'CA005', category: 'quality', current: 3200, budget: 4000, variance: -20.0, trend: 'down' },
     { id: 'CA006', category: 'overhead', current: 12800, budget: 13000, variance: -1.5, trend: 'stable' }
   ];
+
+  // Prepare data for category chart (avg performance per category)
+  const categoryData = React.useMemo(() => {
+    if (analyticsData) {
+      const prod = analyticsData.production?.daily_summary?.efficiency ?? kpis.find(k => k.category === 'production')?.value ?? 0;
+      const qual = analyticsData.quality?.overall_metrics?.average_score ?? kpis.find(k => k.category === 'quality')?.value ?? 0;
+      const eff = analyticsData.machines?.fleet_overview?.average_utilization ?? kpis.find(k => k.category === 'efficiency')?.value ?? 0;
+      const cost = kpis.find(k => k.category === 'cost')?.value ?? 0;
+      return [
+        { name: 'Production', value: Number(prod) },
+        { name: 'Quality', value: Number(qual) },
+        { name: 'Efficiency', value: Number(eff) },
+        { name: 'Cost', value: Number(cost) }
+      ];
+    }
+
+    return ['production', 'quality', 'efficiency', 'cost'].map((category) => {
+      const categoryKPIs = kpis.filter(kpi => kpi.category === category);
+      const avgPerformance = categoryKPIs.length
+        ? categoryKPIs.reduce((sum, kpi) => sum + ((kpi.value / kpi.target) * 100), 0) / categoryKPIs.length
+        : 0;
+      return { name: category.charAt(0).toUpperCase() + category.slice(1), value: Number(avgPerformance.toFixed(1)) };
+    });
+  }, [analyticsData, kpis]);
+
+  
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -173,6 +218,86 @@ const AnalyticsPage: React.FC = () => {
     }
   };
 
+  const handleExport = async (format: 'excel' | 'csv' | 'pdf' = 'excel') => {
+    try {
+      setLoading(true);
+
+      // Build a lightweight analytics payload from available page data
+      const analyticsData = {
+        overview: {
+          overall_score: 94,
+          total_production: kpis.find(k => k.id === 'KPI001')?.value || 0,
+          average_quality: kpis.find(k => k.category === 'quality') ? 96.8 : 0,
+          machine_utilization: 87,
+          active_alerts: 3,
+          completed_batches: 47
+        },
+        production: {
+          daily_summary: { total_output: productionTrends.reduce((s, p) => s + p.total, 0), efficiency: 94.2, defect_rate: 1.8, avg_cycle_time: 4.2 }
+        },
+        quality: { overall_metrics: { average_score: 96.8, pass_rate: 98.1, defect_rate: 1.9, ai_accuracy: 94.3, inspection_count: 24 } },
+        machines: { machine_details: [] },
+        workflow: { process_stages: [] }
+      };
+
+      const filters = { timeRange: selectedPeriod };
+
+      // @ts-ignore - dynamic access to export service static helpers
+      const ExportSvc: any = ExportService as any;
+      const exportData = ExportSvc.generateAnalyticsReportData(analyticsData, filters, user);
+
+      if (format === 'excel') {
+        await ExportSvc.exportToExcel(exportData);
+      } else if (format === 'csv') {
+        await ExportSvc.exportToCSV(exportData);
+      } else {
+        await ExportSvc.exportToPDF(exportData);
+      }
+    } catch (err) {
+      console.error('Export failed', err);
+      alert('Export failed. See console for details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Shared refresh function with improved error logging
+  const refreshAnalytics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await AnalyticsService.loadAllAnalytics();
+      setAnalyticsData(data);
+      console.log('Analytics refreshed', data);
+    } catch (err: any) {
+      console.error('Failed to load analytics', err);
+      // Axios-like error details
+      if (err?.response) {
+        try {
+          console.error('Response status:', err.response.status);
+          console.error('Response data:', JSON.stringify(err.response.data, null, 2));
+        } catch (e) {
+          console.error('Error serializing response data', e);
+        }
+      }
+      const msg = err?.message || (err?.response?.data && JSON.stringify(err.response.data)) || 'Failed to load analytics';
+      setError(msg);
+      // Provide a concise alert to the user
+      if (typeof window !== 'undefined') {
+        alert(`Failed to load analytics: ${msg}. See console for details.`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-load analytics on mount
+  useEffect(() => {
+    // Fire-and-forget; errors are surfaced to console/alert
+    refreshAnalytics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   if (!user || user.role !== 'supervisor') {
     return <div>Access denied.</div>;
   }
@@ -196,17 +321,9 @@ const AnalyticsPage: React.FC = () => {
               </div>
               
               <div className="flex gap-3">
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" onClick={async () => { await refreshAnalytics(); }}>
                   <RefreshCw className="mr-2" size={16} />
                   Actualiser
-                </Button>
-                <Button variant="secondary" size="sm">
-                  <Download className="mr-2" size={16} />
-                  Exporter
-                </Button>
-                <Button variant="primary" size="sm">
-                  <Settings className="mr-2" size={16} />
-                  Configurer
                 </Button>
               </div>
             </div>
@@ -273,32 +390,20 @@ const AnalyticsPage: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <Card padding="lg">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Indicateurs par Catégorie</h3>
-                    <div className="space-y-4">
-                      {['production', 'quality', 'efficiency', 'cost'].map(category => {
-                        const categoryKPIs = kpis.filter(kpi => kpi.category === category);
-                        const avgPerformance = categoryKPIs.reduce((sum, kpi) => 
-                          sum + ((kpi.value / kpi.target) * 100), 0
-                        ) / categoryKPIs.length;
-                        
-                        return (
-                          <div key={category} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {getCategoryIcon(category)}
-                              <span className="capitalize font-medium">{category}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className="w-24">
-                                <ProgressBar 
-                                  value={avgPerformance} 
-                                  variant={avgPerformance >= 100 ? 'success' : avgPerformance >= 90 ? 'warning' : 'danger'} 
-                                  className="h-2" 
-                                />
-                              </div>
-                              <span className="text-sm font-medium w-12">{avgPerformance.toFixed(1)}%</span>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div style={{ height: 220 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={categoryData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="value" name="Performance (%)">
+                            {categoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={categoryColors[index % categoryColors.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </Card>
 
@@ -330,6 +435,8 @@ const AnalyticsPage: React.FC = () => {
                   </Card>
                 </div>
               </div>
+
+              
             )}
 
             {/* Production Tab */}

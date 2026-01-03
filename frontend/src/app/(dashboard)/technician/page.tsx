@@ -297,13 +297,23 @@ const MaintenanceAlerts: React.FC = () => {
   );
 };
 
-const QuickActions: React.FC = () => {
+import NewTaskForm from '../../../../components/maintenance/NewTaskForm';
+import InspectionForm from '../../../../components/maintenance/InspectionForm';
+
+const QuickActions: React.FC<{ onTaskCreated?: (created: any) => void }> = ({ onTaskCreated }) => {
   const actions = [
     { id: 'qa1', label: 'Nouvelle Tâche', icon: Plus, color: 'bg-green-500 hover:bg-green-600' },
     { id: 'qa2', label: 'Rapport Intervention', icon: FileText, color: 'bg-blue-500 hover:bg-blue-600' },
     { id: 'qa3', label: 'Inspection Machine', icon: CheckCircle, color: 'bg-purple-500 hover:bg-purple-600' },
     { id: 'qa4', label: 'Demande Pièces', icon: Settings, color: 'bg-orange-500 hover:bg-orange-600' }
   ];
+  const [activeAction, setActiveAction] = useState<string | null>(null);
+
+  const handleAction = (actionId: string, label: string) => {
+    // Minimal local behavior: open a confirmation modal/placeholder
+    console.log('Quick action invoked:', actionId);
+    setActiveAction(label);
+  };
 
   return (
     <Card padding="lg">
@@ -314,6 +324,7 @@ const QuickActions: React.FC = () => {
           return (
             <button
               key={action.id}
+              onClick={() => handleAction(action.id, action.label)}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg text-white transition-colors ${action.color}`}
             >
               <IconComponent size={24} />
@@ -322,6 +333,28 @@ const QuickActions: React.FC = () => {
           );
         })}
       </div>
+
+      {activeAction && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30">
+          <Card padding="md">
+            <div className="p-4">
+              {activeAction === 'Nouvelle Tâche' ? (
+                <NewTaskForm onClose={() => setActiveAction(null)} onCreated={(created) => { if (onTaskCreated) onTaskCreated(created); }} />
+              ) : activeAction === 'Inspection Machine' ? (
+                <InspectionForm onClose={() => setActiveAction(null)} onCreated={(created) => { if (onTaskCreated) onTaskCreated(created); }} />
+              ) : (
+                <div>
+                  <h4 className="text-lg font-semibold mb-2">{activeAction}</h4>
+                  <p className="text-sm text-gray-600 mb-4">This is a placeholder for the "{activeAction}" flow.</p>
+                  <div className="flex justify-end gap-2">
+                    <Button onClick={() => setActiveAction(null)} variant="secondary" size="sm">Close</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      )}
     </Card>
   );
 };
@@ -336,8 +369,8 @@ const TechnicianDashboard: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Sample data
-  const maintenanceTasks: MaintenanceTask[] = [
+  // Sample data (kept in state so we can refresh when a new task is created)
+  const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([
     {
       id: 'MT001',
       machineId: 'M001',
@@ -377,7 +410,25 @@ const TechnicianDashboard: React.FC = () => {
       description: 'Inspection qualité hebdomadaire',
       location: 'Atelier C'
     }
-  ];
+  ]);
+
+  const handleTaskCreated = (created: any) => {
+    if (!created) return;
+    const newTask: MaintenanceTask = {
+      id: String(created.id || `MT${Date.now()}`),
+      machineId: String(created.machine?.id || created.machine || created.machine_id || 'M-unknown'),
+      machineName: created.machine?.name || created.machine_name || String(created.machine) || 'Machine',
+      type: (created.type as any) || 'corrective',
+      priority: (created.priority as any) || 'medium',
+      status: (created.status as any) || 'pending',
+      scheduledDate: created.scheduled_date || created.created_at || new Date().toISOString(),
+      estimatedDuration: created.estimated_duration || 60,
+      assignedTo: created.technician_name || created.assigned_to || 'Current User',
+      description: created.issue_reported || created.description || '',
+      location: created.location || ''
+    };
+    setMaintenanceTasks(prev => [newTask, ...prev]);
+  };
 
   const machines: MachineStatus[] = [
     {
@@ -472,7 +523,7 @@ const TechnicianDashboard: React.FC = () => {
             {/* Bottom Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <MaintenanceAlerts />
-              <QuickActions />
+              <QuickActions onTaskCreated={handleTaskCreated} />
             </div>
           </div>
         </main>

@@ -34,6 +34,8 @@ import {
   Star,
   Trash2
 } from 'lucide-react';
+import apiService from '@/services/api';
+import NewScheduleModal from '@/components/reports/NewScheduleModal';
 
 interface Report {
   id: string;
@@ -88,178 +90,17 @@ const ReportsPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const reports: Report[] = [
-    {
-      id: 'R001',
-      title: 'Rapport Production Mensuel - Janvier 2025',
-      type: 'production',
-      status: 'ready',
-      frequency: 'monthly',
-      format: 'pdf',
-      createdBy: 'Amadou Traoré',
-      createdAt: '2025-01-26 09:00',
-      lastGenerated: '2025-01-26 10:30',
-      recipients: ['direction@textpro.ml', 'production@textpro.ml'],
-      description: 'Analyse complète de la production du mois avec KPIs et tendances',
-      tags: ['production', 'mensuel', 'kpi'],
-      priority: 'high',
-      size: '2.4 MB',
-      downloadCount: 12
-    },
-    {
-      id: 'R002',
-      title: 'Rapport Qualité Hebdomadaire S4',
-      type: 'quality',
-      status: 'ready',
-      frequency: 'weekly',
-      format: 'excel',
-      createdBy: 'Awa Diarra',
-      createdAt: '2025-01-26 08:15',
-      lastGenerated: '2025-01-26 08:45',
-      recipients: ['qualite@textpro.ml', 'superviseurs@textpro.ml'],
-      description: 'Suivi des indicateurs qualité et non-conformités de la semaine',
-      tags: ['qualité', 'hebdomadaire', 'conformité'],
-      priority: 'medium',
-      size: '1.8 MB',
-      downloadCount: 8
-    },
-    {
-      id: 'R003',
-      title: 'Performance Équipes - Janvier 2025',
-      type: 'performance',
-      status: 'generating',
-      frequency: 'monthly',
-      format: 'pdf',
-      createdBy: 'Fatima Diallo',
-      createdAt: '2025-01-26 07:30',
-      recipients: ['rh@textpro.ml', 'direction@textpro.ml'],
-      description: 'Évaluation de la performance des équipes et recommandations',
-      tags: ['performance', 'équipes', 'rh'],
-      priority: 'medium',
-      downloadCount: 0
-    },
-    {
-      id: 'R004',
-      title: 'Analyse Coûts Trimestrielle Q1',
-      type: 'cost',
-      status: 'draft',
-      frequency: 'quarterly',
-      format: 'excel',
-      createdBy: 'Ibrahim Keita',
-      createdAt: '2025-01-25 16:45',
-      recipients: ['finance@textpro.ml', 'direction@textpro.ml'],
-      description: 'Analyse détaillée des coûts de production et optimisations',
-      tags: ['coûts', 'trimestriel', 'finance'],
-      priority: 'high',
-      downloadCount: 0
-    },
-    {
-      id: 'R005',
-      title: 'Rapport Sécurité Journalier',
-      type: 'safety',
-      status: 'ready',
-      frequency: 'daily',
-      format: 'pdf',
-      createdBy: 'Sekou Camara',
-      createdAt: '2025-01-26 06:00',
-      lastGenerated: '2025-01-26 06:30',
-      recipients: ['securite@textpro.ml'],
-      description: 'État quotidien de la sécurité et incidents reportés',
-      tags: ['sécurité', 'quotidien', 'incidents'],
-      priority: 'urgent',
-      size: '0.8 MB',
-      downloadCount: 5
-    }
-  ];
+  const [reports, setReports] = useState<Report[]>([]);
+  const [reportTemplates, setReportTemplates] = useState<ReportTemplate[]>([]);
+  const [scheduledReports, setScheduledReports] = useState<ScheduledReport[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [showNewSchedule, setShowNewSchedule] = useState(false);
+  // Backend currently does not expose a schedules creation endpoint; keep scheduling UI disabled
+  const scheduleAvailable = false;
 
-  const reportTemplates: ReportTemplate[] = [
-    {
-      id: 'T001',
-      name: 'Production Mensuelle Standard',
-      category: 'production',
-      description: 'Template complet pour les rapports de production mensuels',
-      sections: ['Vue d\'ensemble', 'KPIs Production', 'Analyse par Produit', 'Tendances', 'Recommandations'],
-      estimatedTime: 15,
-      dataPoints: 45,
-      popularity: 95
-    },
-    {
-      id: 'T002',
-      name: 'Qualité Hebdomadaire Détaillé',
-      category: 'quality',
-      description: 'Analyse complète des métriques qualité sur base hebdomadaire',
-      sections: ['Conformité Global', 'Défauts par Type', 'Audits', 'Actions Correctives', 'Satisfaction Client'],
-      estimatedTime: 12,
-      dataPoints: 38,
-      popularity: 87
-    },
-    {
-      id: 'T003',
-      name: 'Performance Équipes Mensuel',
-      category: 'performance',
-      description: 'Évaluation détaillée de la performance des équipes',
-      sections: ['OEE par Équipe', 'Productivité', 'Formation', 'Objectifs', 'Plan d\'Action'],
-      estimatedTime: 18,
-      dataPoints: 52,
-      popularity: 78
-    },
-    {
-      id: 'T004',
-      name: 'Coûts Trimestriel Complet',
-      category: 'cost',
-      description: 'Analyse financière approfondie des coûts de production',
-      sections: ['Coûts Directs', 'Coûts Indirects', 'Variances Budget', 'ROI', 'Projections'],
-      estimatedTime: 25,
-      dataPoints: 67,
-      popularity: 82
-    },
-    {
-      id: 'T005',
-      name: 'Sécurité et Conformité',
-      category: 'safety',
-      description: 'Rapport de sécurité et conformité réglementaire',
-      sections: ['Incidents', 'Formations Sécurité', 'Équipements Protection', 'Audits', 'Conformité'],
-      estimatedTime: 10,
-      dataPoints: 28,
-      popularity: 91
-    }
-  ];
+  // reportTemplates state defined above
 
-  const scheduledReports: ScheduledReport[] = [
-    {
-      id: 'S001',
-      reportId: 'R001',
-      reportTitle: 'Rapport Production Mensuel',
-      frequency: 'Mensuel - 1er du mois',
-      nextRun: '2025-02-01 09:00',
-      recipients: ['direction@textpro.ml', 'production@textpro.ml'],
-      status: 'active',
-      lastRun: '2025-01-01 09:00',
-      runCount: 12
-    },
-    {
-      id: 'S002',
-      reportId: 'R002',
-      reportTitle: 'Rapport Qualité Hebdomadaire',
-      frequency: 'Hebdomadaire - Lundi 8h',
-      nextRun: '2025-01-27 08:00',
-      recipients: ['qualite@textpro.ml'],
-      status: 'active',
-      lastRun: '2025-01-20 08:00',
-      runCount: 48
-    },
-    {
-      id: 'S003',
-      reportId: 'R005',
-      reportTitle: 'Rapport Sécurité Journalier',
-      frequency: 'Quotidien - 6h30',
-      nextRun: '2025-01-27 06:30',
-      recipients: ['securite@textpro.ml'],
-      status: 'active',
-      lastRun: '2025-01-26 06:30',
-      runCount: 365
-    }
-  ];
+  // scheduledReports state defined above
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -311,6 +152,83 @@ const ReportsPage: React.FC = () => {
     return <div>Access denied.</div>;
   }
 
+  // Load reports from API
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const dashboard = await apiService.getReportsDashboard();
+
+        if (!mounted) return;
+
+        // Try to parse common shapes
+        setReports(dashboard?.reports || dashboard?.data?.reports || []);
+        setReportTemplates(dashboard?.templates || dashboard?.data?.templates || []);
+        setScheduledReports(dashboard?.scheduled || dashboard?.data?.scheduled || []);
+
+        // As fallback, fetch production/quality-specific lists and merge if empty
+        if ((dashboard?.reports || []).length === 0) {
+          const [prod, qual] = await Promise.allSettled([
+            apiService.getProductionReports(),
+            apiService.getQualityReports()
+          ]);
+          const prodDataRaw = prod.status === 'fulfilled' ? prod.value : [];
+          const qualDataRaw = qual.status === 'fulfilled' ? qual.value : [];
+
+          const normalize = (v: any) => {
+            if (!v) return [];
+            if (Array.isArray(v)) return v;
+            if (v.results && Array.isArray(v.results)) return v.results;
+            if (v.data && Array.isArray(v.data)) return v.data;
+            if (v.data?.results && Array.isArray(v.data.results)) return v.data.results;
+            if (v.items && Array.isArray(v.items)) return v.items;
+            return [];
+          };
+
+          const prodList = normalize(prodDataRaw);
+          const qualList = normalize(qualDataRaw);
+          if (mounted) setReports([...prodList, ...qualList]);
+        }
+      } catch (err) {
+        console.error('Failed to load reports dashboard', err);
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleDownload = async (report: Report) => {
+    try {
+      setLoading(true);
+      const blob = await apiService.generateReport(report.type, { reportId: report.id });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ext = report.format === 'excel' ? 'xlsx' : report.format === 'csv' ? 'csv' : 'pdf';
+      a.download = `${report.title.replace(/[^a-z0-9]/gi, '_').slice(0,120)}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed', err);
+      alert('Download failed. See console for details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerate = async (report: Report) => {
+    // For now generation uses the same endpoint as download
+    await handleDownload(report);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
@@ -329,20 +247,7 @@ const ReportsPage: React.FC = () => {
                 </p>
               </div>
               
-              <div className="flex gap-3">
-                <Button variant="secondary" size="sm">
-                  <Archive className="mr-2" size={16} />
-                  Archive
-                </Button>
-                <Button variant="secondary" size="sm">
-                  <Settings className="mr-2" size={16} />
-                  Configurer
-                </Button>
-                <Button variant="primary" size="sm">
-                  <Plus className="mr-2" size={16} />
-                  Nouveau Rapport
-                </Button>
-              </div>
+              <div className="flex gap-3" />
             </div>
 
             {/* Navigation Tabs */}
@@ -352,8 +257,7 @@ const ReportsPage: React.FC = () => {
                   { key: 'overview', label: 'Vue d\'ensemble', icon: BarChart3 },
                   { key: 'reports', label: 'Mes Rapports', icon: FileText },
                   { key: 'templates', label: 'Templates', icon: Bookmark },
-                  { key: 'scheduled', label: 'Planifiés', icon: Clock },
-                  { key: 'archive', label: 'Archive', icon: Archive }
+                  { key: 'scheduled', label: 'Planifiés', icon: Clock }
                 ].map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
@@ -575,11 +479,11 @@ const ReportsPage: React.FC = () => {
                           
                           {report.status === 'ready' && (
                             <>
-                              <Button variant="secondary" size="sm">
+                              <Button variant="secondary" size="sm" onClick={() => handleDownload(report)}>
                                 <Download className="mr-2" size={16} />
                                 Télécharger
                               </Button>
-                              <Button variant="secondary" size="sm">
+                              <Button variant="secondary" size="sm" onClick={() => alert('Send not implemented')}>
                                 <Send className="mr-2" size={16} />
                                 Envoyer
                               </Button>
@@ -587,7 +491,7 @@ const ReportsPage: React.FC = () => {
                           )}
                           
                           {report.status === 'draft' && (
-                            <Button variant="primary" size="sm">
+                            <Button variant="primary" size="sm" onClick={() => handleGenerate(report)}>
                               Générer
                             </Button>
                           )}
@@ -664,10 +568,32 @@ const ReportsPage: React.FC = () => {
                 <Card padding="lg">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-semibold text-gray-900">Rapports Planifiés</h2>
-                    <Button variant="primary" size="sm">
-                      <Plus className="mr-2" size={16} />
-                      Nouvelle Planification
-                    </Button>
+                    {scheduleAvailable ? (
+                      <>
+                        <Button variant="primary" size="sm" onClick={() => setShowNewSchedule(true)}>
+                          <Plus className="mr-2" size={16} />
+                          Nouvelle Planification
+                        </Button>
+                        {showNewSchedule && (
+                          <NewScheduleModal
+                            open={showNewSchedule}
+                            onClose={() => setShowNewSchedule(false)}
+                            onCreated={(created) => {
+                              setScheduledReports(prev => [created, ...prev]);
+                              setShowNewSchedule(false);
+                            }}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <Button variant="secondary" size="sm" disabled>
+                          <Plus className="mr-2" size={16} />
+                          Nouvelle Planification
+                        </Button>
+                        <span className="text-sm text-gray-500">La planification n'est pas disponible sur le serveur.</span>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="grid gap-4">

@@ -97,9 +97,13 @@ export interface BatchWorkflow extends BaseModel {
   batch_number?: string; // Computed field from backend
   description?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'delayed' | 'cancelled';
+  // Human-friendly status label provided by backend
+  status_display?: string;
   start_date?: string;
   end_date?: string;
   supervisor: User;
+  // Convenience string field sometimes returned by backend
+  supervisor_name?: string;
   product_type?: string; // Referenced in quality models
   current_stage?: string; // Referenced in quality models
   is_overdue: boolean;
@@ -249,9 +253,24 @@ export interface QualityFilters {
 export interface BatchFilters {
   status?: string;
   supervisor?: string;
+  // Pagination and sizing
+  page?: number;
+  page_size?: number;
   date_from?: string;
   date_to?: string;
   search?: string;
+}
+
+// Batch workflow statistics used by admin and dashboard components
+export interface BatchWorkflowStats {
+  total_batches: number;
+  active_batches: number;
+  completed_batches?: number;
+  overdue_batches: number;
+  by_status: Record<string, number>;
+  by_supervisor: Record<string, number>;
+  avg_completion_time?: number;
+  current_efficiency?: number;
 }
 
 // Dashboard Statistics

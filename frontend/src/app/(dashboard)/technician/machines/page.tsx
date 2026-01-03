@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../../../contexts/AuthContext';
 import TechnicianSidebar from '../../../../../components/layout/TechnicianSidebar';
@@ -7,6 +7,9 @@ import Card from '../../../../../components/ui/Card';
 import Button from '../../../../../components/ui/Button';
 import Badge from '../../../../../components/ui/Badge';
 import ProgressBar from '../../../../../components/ui/ProgressBar';
+import NewTaskForm from '../../../../../components/maintenance/NewTaskForm';
+import { useRouter } from 'next/navigation';
+import { machineService } from '../../../../../services/machineService';
 import { 
   Cog,
   Search,
@@ -83,6 +86,7 @@ interface MaintenanceHistory {
 
 const MachinesPage: React.FC = () => {
   const { user } = useAuth();
+    const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'monitoring' | 'maintenance' | 'diagnostics'>('overview');
   const [selectedMachine, setSelectedMachine] = useState<string | null>(null);
@@ -90,10 +94,12 @@ const MachinesPage: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1000);
+    // initial machine load
+    loadMachines();
     return () => clearTimeout(timer);
   }, []);
 
-  const machines: Machine[] = [
+  const initialMachines: Machine[] = [
     {
       id: 'M001',
       name: 'Métier à Tisser A1',
@@ -256,6 +262,25 @@ const MachinesPage: React.FC = () => {
     }
   ];
 
+  const [machines, setMachines] = useState<Machine[]>(initialMachines);
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [showIntervention, setShowIntervention] = useState(false);
+
+  const loadMachines = async () => {
+    try {
+      const res = await machineService.getMachines({ page_size: 200, created_by_role: 'admin' });
+      if (res && res.success && res.data) {
+        let list: any[] = [];
+        if (Array.isArray(res.data)) list = res.data;
+        else if (Array.isArray((res.data as any).results)) list = (res.data as any).results;
+        else if (Array.isArray((res as any).results)) list = (res as any).results;
+        if (list.length > 0) setMachines(list as any);
+      }
+    } catch (e) {
+      console.error('Failed to load machines on page:', e);
+    }
+  };
+
   const maintenanceHistory: MaintenanceHistory[] = [
     {
       id: 'MH001',
@@ -351,11 +376,11 @@ const MachinesPage: React.FC = () => {
               </div>
               
               <div className="flex gap-3">
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary" size="sm" onClick={() => loadMachines()}>
                   <RefreshCw className="mr-2" size={16} />
                   Actualiser
                 </Button>
-                <Button variant="primary" size="sm">
+                <Button variant="primary" size="sm" onClick={() => setShowNewTask(true)}>
                   <Plus className="mr-2" size={16} />
                   Nouvelle Tâche
                 </Button>
@@ -541,6 +566,16 @@ const MachinesPage: React.FC = () => {
               </div>
             )}
 
+            {showNewTask && (
+              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                <Card padding="md">
+                  <div className="p-4">
+                    <NewTaskForm onClose={() => setShowNewTask(false)} onCreated={() => setShowNewTask(false)} />
+                  </div>
+                </Card>
+              </div>
+            )}
+
             {/* Monitoring Tab */}
             {activeTab === 'monitoring' && (
               <div className="space-y-6">
@@ -625,7 +660,7 @@ const MachinesPage: React.FC = () => {
                 <Card padding="lg">
                   <div className="flex items-center justify-between mb-6">
                     <h2 className="text-xl font-semibold text-gray-900">Historique de Maintenance</h2>
-                    <Button variant="primary" size="sm">
+                    <Button variant="primary" size="sm" onClick={() => { router.push('/dashboard/technician/maintenance/new'); }}>
                       <Plus className="mr-2" size={16} />
                       Nouvelle Intervention
                     </Button>
@@ -801,6 +836,15 @@ const MachinesPage: React.FC = () => {
                     ))}
                   </div>
                 </Card>
+                  {showIntervention && (
+                    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                      <Card padding="md">
+                        <div className="p-4">
+                          <NewTaskForm onClose={() => setShowIntervention(false)} onCreated={() => setShowIntervention(false)} />
+                        </div>
+                      </Card>
+                    </div>
+                  )}
               </div>
             )}
           </div>

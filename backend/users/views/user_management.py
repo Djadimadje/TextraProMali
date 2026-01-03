@@ -18,7 +18,7 @@ from ..serializers import (
     UserUpdateSerializer,
     UserPasswordResetSerializer
 )
-from ..permissions import IsAdmin
+from ..permissions import IsAdmin, IsSupervisor
 import logging
 
 logger = logging.getLogger('texproai.users')
@@ -36,6 +36,13 @@ class UserViewSet(ModelViewSet):
     """
     queryset = User.objects.all()
     permission_classes = [IsAdmin]
+
+    def get_permissions(self):
+        """Allow supervisors to create users, keep admin-only for other actions"""
+        # Allow supervisors to create users and to list users (read-only view)
+        if self.action in ('create', 'list'):
+            return [IsSupervisor()]
+        return [IsAdmin()]
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -140,10 +147,10 @@ class UserViewSet(ModelViewSet):
             if serializer.is_valid():
                 user = serializer.save()
                 logger.info(f"User created successfully: {user.username}")
-                
+
                 # Return user details
                 detail_serializer = UserDetailSerializer(user, context={'request': request})
-                
+
                 return Response({
                     'success': True,
                     'message': 'User created successfully',
@@ -160,10 +167,11 @@ class UserViewSet(ModelViewSet):
             }, status=status.HTTP_400_BAD_REQUEST)
             
         except Exception as e:
-            logger.error(f"User creation error: {str(e)}")
+            logger.exception("User creation error")
             return Response({
                 'success': False,
-                'message': 'Failed to create user'
+                'message': 'Failed to create user',
+                'error': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def retrieve(self, request, *args, **kwargs):

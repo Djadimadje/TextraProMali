@@ -1,14 +1,14 @@
 'use client';
 
 import React from 'react';
-import { 
+import {
   Clock,
   CheckCircle,
   AlertTriangle,
   TrendingUp,
   Users
 } from 'lucide-react';
-import { BatchWorkflowStats } from '../../../../../../services/workflowService';
+import type { BatchWorkflowStats } from '@/types/api';
 
 interface WorkflowStatsCardsProps {
   stats: BatchWorkflowStats;

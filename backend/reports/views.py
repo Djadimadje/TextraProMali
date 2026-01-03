@@ -27,6 +27,11 @@ from reports.advanced_generators import (
     generate_allocation_pdf, generate_allocation_excel,
     generate_analytics_pdf, generate_analytics_excel
 )
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.generics import CreateAPIView
+from reports.serializers.report_schedule_serializer import ReportScheduleSerializer
+from reports.models.report_schedule import ReportSchedule
 
 
 class WorkflowReportPDFView(APIView):
@@ -373,3 +378,18 @@ class ReportsHealthView(APIView):
                 'error': f'Health check failed: {str(e)}',
                 'data': {'reports_service': 'error'}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ReportScheduleCreateView(CreateAPIView):
+    """Create a scheduled report
+    POST /api/v1/reports/schedules/
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = ReportScheduleSerializer
+    queryset = ReportSchedule.objects.all()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'success': True, 'data': serializer.data}, status=status.HTTP_201_CREATED)

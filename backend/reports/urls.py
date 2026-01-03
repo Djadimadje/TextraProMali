@@ -31,6 +31,8 @@ from reports.dashboard_views import (
     ReportsDashboardView, ReportsMetaView
 )
 
+from reports.views import ReportScheduleCreateView
+
 # URL patterns for reports endpoints
 # Note: These will be prefixed with /api/v1/reports/ from core/urls.py
 urlpatterns = [
@@ -73,4 +75,6 @@ urlpatterns = [
     
     # Reports system health check (Admin, Analyst)
     path('health/', ReportsHealthView.as_view(), name='reports-health'),
+    # Schedule creation endpoint
+    path('schedules/', ReportScheduleCreateView.as_view(), name='reports-schedules'),
 ]

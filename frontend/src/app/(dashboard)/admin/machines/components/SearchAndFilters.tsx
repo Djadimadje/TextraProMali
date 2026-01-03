@@ -25,6 +25,7 @@ interface SearchAndFiltersProps {
   setOperatorFilter: (operator: string) => void;
   onExportMachines: () => void;
   onAddMachine: () => void;
+  onAddMachineType?: () => void;
   onRefresh: () => void;
   machineTypes: string[];
   locations: string[];
@@ -44,6 +45,7 @@ const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
   setOperatorFilter,
   onExportMachines,
   onAddMachine,
+  onAddMachineType,
   onRefresh,
   machineTypes,
   locations,
@@ -134,14 +136,14 @@ const SearchAndFilters: React.FC<SearchAndFiltersProps> = ({
             Export
           </Button>
 
-          {/* Add Machine */}
+          {/* Machine Type button (replaces toolbar "Add Machine") */}
           <Button
             variant="primary"
-            onClick={onAddMachine}
+            onClick={onAddMachineType || onAddMachine}
             className="flex items-center gap-2"
           >
-            <Plus size={16} />
-            Add Machine
+            <Building size={16} />
+            Machine Type
           </Button>
         </div>
       </div>

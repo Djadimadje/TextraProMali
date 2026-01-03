@@ -13,6 +13,7 @@ from .quality_serializers import (
     DefectTypeSerializer,
     QualityDashboardSerializer,
 )
+from .quality_audit_serializer import QualityAuditSerializer
 
 __all__ = [
     'QualityCheckSerializer',
@@ -23,4 +24,5 @@ __all__ = [
     'InspectorSerializer',
     'DefectTypeSerializer',
     'QualityDashboardSerializer',
+    'QualityAuditSerializer',
 ]

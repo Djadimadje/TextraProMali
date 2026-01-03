@@ -47,7 +47,7 @@ class QualityPermission(permissions.BasePermission):
         
         # Write permissions only for inspectors and admins
         if request.method in ['POST', 'PUT', 'PATCH']:
-            return user_role in ['inspector', 'admin']
+            return user_role in ['inspector', 'admin', 'supervisor']
         
         # Delete permissions only for admins
         if request.method == 'DELETE':
@@ -123,7 +123,7 @@ class CanUploadImages(permissions.BasePermission):
         
         # Only inspectors and admins can upload images
         if request.method == 'POST' and 'image' in request.FILES:
-            return user_role in ['inspector', 'admin']
+            return user_role in ['inspector', 'admin', 'supervisor']
         
         return True  # Allow other operations to be handled by other permissions
 

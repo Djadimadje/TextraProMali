@@ -1,13 +1,36 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, User, AlertCircle } from 'lucide-react';
-import { BatchWorkflow, BatchWorkflowCreateData, BatchWorkflowUpdateData, workflowService, User as UserType } from '../../../../../../services/workflowService';
+import { X, Calendar, AlertCircle } from 'lucide-react';
+import workflowService from '../../../../../../services/workflowService';
+
+// Local minimal types to avoid importing type-only exports from the service module
+interface BatchWorkflow {
+  id: string | number;
+  batch_code: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  status?: string;
+  status_display?: string;
+  progress_percentage?: number;
+  is_overdue?: boolean;
+}
+
+type BatchWorkflowCreateData = {
+  batch_code: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+};
+
+type BatchWorkflowUpdateData = Partial<BatchWorkflowCreateData>;
 
 interface BatchWorkflowModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void;
+  // onSave may receive the created/updated batch object for optimistic updates
+  onSave: (created?: any) => void;
   batch: BatchWorkflow | null;
 }
 
@@ -20,12 +43,9 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
   const [formData, setFormData] = useState<BatchWorkflowCreateData>({
     batch_code: '',
     description: '',
-    supervisor: '',
     start_date: '',
     end_date: ''
   });
-
-  const [supervisors, setSupervisors] = useState<UserType[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
@@ -33,13 +53,11 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadSupervisors();
       if (batch) {
         // Populate form with existing batch data
         setFormData({
           batch_code: batch.batch_code,
           description: batch.description || '',
-          supervisor: batch.supervisor,
           start_date: batch.start_date ? batch.start_date.slice(0, 16) : '', // Format for datetime-local
           end_date: batch.end_date ? batch.end_date.slice(0, 16) : ''
         });
@@ -48,7 +66,6 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
         setFormData({
           batch_code: '',
           description: '',
-          supervisor: '',
           start_date: '',
           end_date: ''
         });
@@ -57,14 +74,18 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
     }
   }, [isOpen, batch]);
 
-  const loadSupervisors = async () => {
-    try {
-      const supervisorList = await workflowService.getSupervisors();
-      setSupervisors(supervisorList);
-    } catch (error) {
-      console.error('Failed to load supervisors:', error);
-    }
+  // Helper to format a Date to local `YYYY-MM-DDTHH:MM` for `datetime-local` inputs
+  const formatLocalDateTime = (d: Date) => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
+
+  const minNow = formatLocalDateTime(new Date());
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -84,21 +105,17 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     // Convert array of errors to object
-    validationErrors.forEach(error => {
-      if (error.includes('Batch code')) {
-        newErrors.batch_code = error;
-      } else if (error.includes('End date')) {
-        newErrors.end_date = error;
+    validationErrors.forEach((err: string) => {
+      if (err.includes('Batch code')) {
+        newErrors.batch_code = err;
+      } else if (err.includes('End date')) {
+        newErrors.end_date = err;
       }
     });
 
     // Additional validations
     if (!formData.batch_code.trim()) {
       newErrors.batch_code = 'Batch code is required';
-    }
-
-    if (!formData.supervisor) {
-      newErrors.supervisor = 'Supervisor is required';
     }
 
     // Date validation
@@ -128,18 +145,18 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
         // Update existing batch
         const updateData: BatchWorkflowUpdateData = {
           description: formData.description,
-          supervisor: formData.supervisor,
           start_date: formData.start_date || undefined,
           end_date: formData.end_date || undefined
         };
         
-        await workflowService.updateBatchWorkflow(batch.id, updateData);
+        const updated = await workflowService.updateBatchWorkflow(batch.id, updateData);
+        onSave(updated);
       } else {
         // Create new batch
-        await workflowService.createBatchWorkflow(formData);
+        const created = await workflowService.createBatchWorkflow(formData as BatchWorkflowCreateData);
+        onSave(created);
       }
-      
-      onSave();
+
       onClose();
     } catch (error) {
       console.error('Failed to save batch:', error);
@@ -226,33 +243,7 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
             />
           </div>
 
-          {/* Supervisor */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Supervisor *
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <select
-                name="supervisor"
-                value={formData.supervisor}
-                onChange={handleInputChange}
-                className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
-                  errors.supervisor ? 'border-red-500' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Select a supervisor</option>
-                {supervisors.map(supervisor => (
-                  <option key={supervisor.id} value={supervisor.id}>
-                    {supervisor.first_name} {supervisor.last_name} ({supervisor.username})
-                  </option>
-                ))}
-              </select>
-            </div>
-            {errors.supervisor && (
-              <p className="mt-1 text-sm text-red-600">{errors.supervisor}</p>
-            )}
-          </div>
+          {/* Supervisor removed — field is no longer required */}
 
           {/* Date Range */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -267,6 +258,7 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
                   name="start_date"
                   value={formData.start_date}
                   onChange={handleInputChange}
+                  min={minNow}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
@@ -283,6 +275,7 @@ const BatchWorkflowModal: React.FC<BatchWorkflowModalProps> = ({
                   name="end_date"
                   value={formData.end_date}
                   onChange={handleInputChange}
+                  min={formData.start_date && formData.start_date.length > 0 ? formData.start_date : minNow}
                   className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                     errors.end_date ? 'border-red-500' : 'border-gray-300'
                   }`}

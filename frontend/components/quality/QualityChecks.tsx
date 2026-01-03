@@ -33,6 +33,7 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
     date_to: '',
     search: ''
   });
+  const [searchInput, setSearchInput] = useState(filters.search);
   const [selectedCheck, setSelectedCheck] = useState<QualityCheck | null>(null);
   const [showDetails, setShowDetails] = useState(false);
   const [showNewCheckModal, setShowNewCheckModal] = useState(false);
@@ -73,6 +74,15 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
     if (check.defect_detected) return 'failed';
     return 'passed';
   };
+
+  // Debounce local search input to avoid firing requests on every keystroke
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const s = searchInput.trim();
+      setFilters(prev => ({ ...prev, search: s.length >= 2 ? s : '' }));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   useEffect(() => {
     loadQualityChecks();
@@ -247,8 +257,8 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
               <input
                 type="text"
                 placeholder="Batch code, inspector..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
               />
             </div>
@@ -262,9 +272,9 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
             >
               <option value="">All Status</option>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed</option>
-              <option value="warning">Warning</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
           
@@ -352,15 +362,35 @@ const QualityChecks: React.FC<QualityChecksProps> = ({ onNewCheck }) => {
         
         {error ? (
           <div className="p-6">
-            <div className="flex items-center text-red-600">
-              <XCircle className="h-5 w-5 mr-2" />
-              <span>{error}</span>
+            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded p-4">
+              <div className="flex items-center text-red-600">
+                <XCircle className="h-5 w-5 mr-2" />
+                <div>
+                  <div className="font-medium">{error}</div>
+                  <div className="text-sm text-red-500">Server error occurred while loading quality checks.</div>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={loadQualityChecks}
+                  className="px-3 py-1 bg-white border border-red-200 rounded text-sm text-red-700 hover:bg-red-50"
+                >
+                  Retry
+                </button>
+              </div>
             </div>
           </div>
         ) : checks.length === 0 ? (
           <div className="p-6 text-center">
             <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600">No quality checks found</p>
+            {filters.search ? (
+              <div>
+                <p className="text-gray-700 mb-2">No quality checks match <span className="font-medium">"{filters.search}"</span></p>
+                <p className="text-sm text-gray-500">Try a different search term or clear filters.</p>
+              </div>
+            ) : (
+              <p className="text-gray-600">No quality checks found</p>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">

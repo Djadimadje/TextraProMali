@@ -216,6 +216,12 @@ class MachineViewSet(viewsets.ModelViewSet):
                 if machine.needs_maintenance or machine.maintenance_urgency in ['urgent', 'critical']:
                     maintenance_machines.append(machine.id)
             queryset = queryset.filter(id__in=maintenance_machines)
+
+        # Filter by creator role (e.g., created_by_role=admin)
+        created_by_role = self.request.query_params.get('created_by_role')
+        if created_by_role:
+            # Join to the related user model and filter by role
+            queryset = queryset.filter(created_by__role=created_by_role)
         
         return queryset
     

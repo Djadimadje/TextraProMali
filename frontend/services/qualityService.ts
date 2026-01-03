@@ -176,9 +176,24 @@ class QualityService {
     
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
+        // Prevent sending extremely short search terms which can cause unsafe
+        // DB lookups on the backend (e.g. ForeignKey icontains on joined fields).
+        if (key === 'search') {
+          const s = String(value).trim();
+          if (s.length < 2) return; // skip short searches
+        }
         params.append(key, value.toString());
       }
     });
+
+    // Final safety: remove any `search` param shorter than 2 chars to avoid
+    // backend lookups that may cause joins/unsupported lookups.
+    if (params.has('search')) {
+      const s = params.get('search') || '';
+      if (s.trim().length < 2) {
+        params.delete('search');
+      }
+    }
 
     const queryString = params.toString();
     const url = `${this.baseUrl}/checks/${queryString ? `?${queryString}` : ''}`;
@@ -193,7 +208,16 @@ class QualityService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        const message = errorData.message || `HTTP ${response.status}: ${response.statusText}`;
+        // Avoid noisy console.error in the browser for server errors —
+        // return structured failure so UI can show a friendly banner and retry.
+        // Keep a debug-level log for developers.
+        console.debug('Quality checks response status:', response.status, message, errorData);
+        return {
+          success: false,
+          message,
+          data: { results: [], count: 0, next: null, previous: null }
+        };
       }
 
       const data = await response.json();

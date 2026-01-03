@@ -9,6 +9,8 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Count, Q, Avg
+from django.core.exceptions import FieldError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.utils import timezone
 from datetime import timedelta
 
@@ -18,6 +20,8 @@ from quality.serializers import (
     QualityStandardSerializer, QualityMetricsSerializer,
     QualityDashboardSerializer, QualityReportSerializer
 )
+from quality.serializers.quality_audit_serializer import QualityAuditSerializer
+from quality.models import QualityAudit
 from quality.permissions import (
     QualityPermission, InspectorOnlyPermission, QualityReportAccess
 )
@@ -49,8 +53,27 @@ class QualityCheckViewSet(viewsets.ModelViewSet):
     # Search options
     search_fields = [
         'batch__batch_code', 'inspector__username', 'comments',
-        'defect_type', 'batch__product_type'
+        'defect_type'
     ]
+
+    def list(self, request, *args, **kwargs):
+        """Wrap list to convert FieldError to 400 Bad Request and avoid 500s."""
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            return super().list(request, *args, **kwargs)
+        except FieldError as e:
+            logger.warning('Bad request in quality checks list (FieldError): %s', e)
+            return Response({'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except DRFValidationError as e:
+            # Validation errors produced by DRF/django-filters (e.g., invalid choice)
+            logger.warning('Bad request in quality checks list (ValidationError): %s', e)
+            # e.detail is usually a dict of field errors; return it directly for clarity
+            return Response({'message': getattr(e, 'detail', str(e))}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            # Log full exception server-side for diagnostics and return safe message to client
+            logger.exception('Unhandled exception in QualityCheckViewSet.list')
+            return Response({'message': 'Internal server error'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     # Ordering options
     ordering_fields = ['created_at', 'updated_at', 'severity', 'status']
@@ -330,9 +353,20 @@ class QualityReportView(viewsets.GenericViewSet):
         try:
             score_data = calculate_batch_quality_score(str(batch_id))
             return Response(score_data)
-            
         except Exception as e:
             return Response(
                 {'error': f'Score calculation failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class QualityAuditViewSet(viewsets.ModelViewSet):
+    """ViewSet to manage scheduled quality audits"""
+
+    queryset = QualityAudit.objects.all()
+    serializer_class = QualityAuditSerializer
+    permission_classes = [QualityReportAccess]
+
+    def perform_create(self, serializer):
+        # created_by will be set by serializer.create if request in context
+        serializer.save()

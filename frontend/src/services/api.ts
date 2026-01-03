@@ -195,16 +195,27 @@ class APIService {
 
   // User Management API
   async getUsers(params?: any): Promise<PaginatedResponse<User>> {
-    const response = await this.api.get<{ success: boolean; data?: PaginatedResponse<User>; message?: string }>('/users/', { params });
-    
-    // Handle Django wrapped response format
-    if (response.data?.success && response.data?.data) {
-      return response.data.data;
-    } else if (response.data && !('success' in response.data)) {
-      // Handle direct response (fallback)
-      return response.data as PaginatedResponse<User>;
-    } else {
-      throw new Error('Invalid users response format');
+    try {
+      const response = await this.api.get<{ success: boolean; data?: PaginatedResponse<User>; message?: string }>('/users/', { params });
+
+      // Handle Django wrapped response format
+      if (response.data?.success && response.data?.data) {
+        return response.data.data;
+      } else if (response.data && !('success' in response.data)) {
+        // Handle direct response (fallback)
+        return response.data as PaginatedResponse<User>;
+      } else {
+        throw new Error('Invalid users response format');
+      }
+    } catch (error: any) {
+      // If the backend denies access to the users list for non-admins, return an empty paginated response
+      if (error?.response?.status === 403) {
+        console.warn('getUsers: access denied (403) — returning empty list');
+        return { count: 0, next: null, previous: null, results: [] } as PaginatedResponse<User>;
+      }
+
+      // Re-throw other errors so callers can handle them
+      throw error;
     }
   }
 
@@ -362,6 +373,17 @@ class APIService {
     return response.data;
   }
 
+  // Quality Audit API (scheduled audits)
+  async getQualityAudits(filters?: any): Promise<PaginatedResponse<any>> {
+    const response = await this.api.get<PaginatedResponse<any>>('/quality/audits/', { params: filters });
+    return response.data;
+  }
+
+  async createQualityAudit(auditData: Partial<any>): Promise<any> {
+    const response = await this.api.post<any>('/quality/audits/', auditData);
+    return response.data;
+  }
+
   // Batch Workflow API
   async getBatchWorkflows(filters?: BatchFilters): Promise<PaginatedResponse<BatchWorkflow>> {
     try {
@@ -505,16 +527,46 @@ class APIService {
   async getMyBatches(): Promise<BatchWorkflow[]> {
     try {
       const response = await this.api.get<{ success: boolean; data?: BatchWorkflow[]; message?: string }>('/workflow/batches/my_batches/');
-      
-      // Handle Django wrapped response format
-      if (response.data?.success && response.data?.data) {
-        return response.data.data;
-      } else if (Array.isArray(response.data)) {
-        // Handle direct response (fallback)
-        return response.data;
-      } else {
-        throw new Error('Invalid my batches response format');
+      // Normalize various backend response shapes into a plain array
+      // Examples handled:
+      // - { success: true, data: [...] }
+      // - { success: true, data: { results: [...] } }
+      // - { results: [...] }
+      // - [...] (direct array)
+      const resData: any = response.data;
+
+      // Direct array
+      if (Array.isArray(resData)) return resData as any;
+
+      // Wrapped success/data
+      if (resData?.success && resData?.data) {
+        const d = resData.data;
+        if (Array.isArray(d)) return d as any;
+        if (d?.results && Array.isArray(d.results)) return d.results as any;
+        if (d?.data && Array.isArray(d.data)) return d.data as any;
+        if (d?.data?.results && Array.isArray(d.data.results)) return d.data.results as any;
       }
+
+      // Paginated or results at top-level
+      if (resData?.results) {
+        // results may be an array
+        if (Array.isArray(resData.results)) return resData.results as any;
+
+        // or results may itself be a wrapped object { success, data: [...] }
+        const r = resData.results as any;
+        if (r?.success && r?.data) {
+          if (Array.isArray(r.data)) return r.data as any;
+          if (r.data?.results && Array.isArray(r.data.results)) return r.data.results as any;
+        }
+
+        // results may contain a data array directly
+        if (r?.data && Array.isArray(r.data)) return r.data as any;
+      }
+
+      // Nested data.results
+      if (resData?.data && resData.data?.results && Array.isArray(resData.data.results)) return resData.data.results as any;
+
+      throw new Error('Invalid my batches response format');
     } catch (error) {
       console.error('Error fetching my batches:', error);
       throw error;
@@ -862,6 +914,19 @@ class APIService {
       }
     } catch (error) {
       console.error('Error fetching financial reports:', error);
+      throw error;
+    }
+  }
+
+  // Create a scheduled report
+  async createReportSchedule(scheduleData: any): Promise<any> {
+    try {
+      const response = await this.api.post<{ success?: boolean; data?: any; message?: string }>('/reports/schedules/', scheduleData);
+      if (response.data?.success && response.data?.data) return response.data.data;
+      if (response.data && !('success' in response.data)) return response.data;
+      return response.data;
+    } catch (error) {
+      console.error('Error creating report schedule:', error);
       throw error;
     }
   }
