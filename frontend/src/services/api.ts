@@ -918,19 +918,6 @@ class APIService {
     }
   }
 
-  // Create a scheduled report
-  async createReportSchedule(scheduleData: any): Promise<any> {
-    try {
-      const response = await this.api.post<{ success?: boolean; data?: any; message?: string }>('/reports/schedules/', scheduleData);
-      if (response.data?.success && response.data?.data) return response.data.data;
-      if (response.data && !('success' in response.data)) return response.data;
-      return response.data;
-    } catch (error) {
-      console.error('Error creating report schedule:', error);
-      throw error;
-    }
-  }
-
   // File upload helper
   async uploadFile(file: File, endpoint: string): Promise<any> {
     const formData = new FormData();

@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import Card from '../ui/Card';
 import { 
   ClipboardCheck, 
@@ -14,6 +15,7 @@ interface QuickActionsProps {
 }
 
 const QuickActions: React.FC<QuickActionsProps> = ({ loading }) => {
+  const router = useRouter();
   if (loading) {
     return (
       <Card variant="elevated" padding="lg">
@@ -77,7 +79,17 @@ const QuickActions: React.FC<QuickActionsProps> = ({ loading }) => {
           return (
             <div
               key={index}
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                if (index === 0) {
+                  router.push('/inspector/quality/new');
+                } else if (index === 1) {
+                  router.push('/inspector/quality/new?ai=true');
+                }
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { if (index === 0) router.push('/inspector/quality/new'); else if (index === 1) router.push('/inspector/quality/new?ai=true'); } }}
+              className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
             >
               <div className={`p-3 rounded-lg ${item.bgColor} mr-4`}>
                 <IconComponent className={`w-6 h-6 ${item.color}`} />

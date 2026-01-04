@@ -153,6 +153,9 @@ const InspectorDashboard: React.FC = () => {
               loading={loading}
             />
 
+
+
+
             {/* Main Dashboard Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column - Quality Metrics & Recent Inspections */}
@@ -178,85 +181,6 @@ const InspectorDashboard: React.FC = () => {
                   data={data?.machineStatus}
                   loading={loading}
                 />
-              </div>
-            </div>
-
-            {/* Performance Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Daily Target</p>
-                    <p className="text-2xl font-bold text-gray-900">50</p>
-                  </div>
-                  <div className="p-3 bg-blue-100 rounded-full">
-                    <Activity className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex items-center text-sm text-green-600">
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    <span>94% completed</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Quality Score</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {data?.qualityMetrics?.avgScore?.toFixed(1) || '0.0'}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-green-100 rounded-full">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex items-center text-sm text-green-600">
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    <span>Above target</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Efficiency</p>
-                    <p className="text-2xl font-bold text-gray-900">97.2%</p>
-                  </div>
-                  <div className="p-3 bg-indigo-100 rounded-full">
-                    <TrendingUp className="w-6 h-6 text-indigo-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex items-center text-sm text-green-600">
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    <span>+2.3% vs yesterday</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">AI Accuracy</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {data?.qualityMetrics?.aiAccuracy?.toFixed(1) || '0.0'}%
-                    </p>
-                  </div>
-                  <div className="p-3 bg-purple-100 rounded-full">
-                    <Activity className="w-6 h-6 text-purple-600" />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <div className="flex items-center text-sm text-green-600">
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    <span>Excellent</span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>

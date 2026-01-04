@@ -1,5 +1,6 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../../contexts/AuthContext';
 import InspectorSidebar from '../../../../../../components/layout/InspectorSidebar';
 import Header from '../../../../../../components/layout/Header';
@@ -57,8 +58,11 @@ const NewInspectionPage: React.FC = () => {
     standards: []
   });
   const [defects, setDefects] = useState<DefectItem[]>([]);
+  const [batchOptions, setBatchOptions] = useState<Array<{ id: string; batch_code: string }>>([]);
   const [aiAnalysisRunning, setAiAnalysisRunning] = useState(false);
   const [overallScore, setOverallScore] = useState<number | null>(null);
+  const [aiAutoTriggered, setAiAutoTriggered] = useState(false);
+  const searchParams = useSearchParams();
 
   const inspectionTemplates = [
     { id: 'IT001', name: 'Standard Fabric Inspection', type: 'hybrid', duration: '15 min' },
@@ -85,17 +89,31 @@ const NewInspectionPage: React.FC = () => {
     // Simulate AI analysis
     await new Promise(resolve => setTimeout(resolve, 3000));
     
-    // Mock AI results
+    // Mock AI results — generate unique IDs to avoid duplicates across runs
+    const generateId = (prefix = 'ID') => {
+      try {
+        // use crypto UUID when available
+        // @ts-ignore
+        if (typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function') {
+          // @ts-ignore
+          return `${prefix}-${(crypto as any).randomUUID()}`;
+        }
+      } catch (e) {
+        // ignore
+      }
+      return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    };
+
     const aiDefects: DefectItem[] = [
       {
-        id: 'AI001',
+        id: generateId('AI'),
         type: 'Color Variation',
         severity: 'medium',
         location: 'Section A2, 15cm from edge',
         description: 'Slight color inconsistency detected in dyed area'
       },
       {
-        id: 'AI002', 
+        id: generateId('AI'),
         type: 'Weave Defect',
         severity: 'low',
         location: 'Section B1, center',
@@ -107,6 +125,47 @@ const NewInspectionPage: React.FC = () => {
     setOverallScore(92.5);
     setAiAnalysisRunning(false);
   };
+
+  useEffect(() => {
+    try {
+      if (!aiAutoTriggered && searchParams?.get('ai') === 'true') {
+        // Move straight to inspection step and trigger AI analysis automatically
+        setCurrentStep('inspection');
+        setAiAutoTriggered(true);
+        // small timeout to ensure UI mounted
+        setTimeout(() => {
+          runAiAnalysis();
+        }, 200);
+      }
+    } catch (e) {
+      // ignore search param parsing errors
+    }
+  }, [searchParams, aiAutoTriggered]);
+
+  // Load batch options from backend
+  useEffect(() => {
+    let mounted = true;
+    const loadBatches = async () => {
+      try {
+        // Try to fetch recent or active batches; fall back to user's batches
+        const resp = await workflowSepyrvice.getBatches({ page_size: 50 });
+        const results = resp?.results || [];
+        if (mounted) {
+          setBatchOptions(results.map((r: any) => ({ id: r.id, batch_code: r.batch_code })));
+        }
+      } catch (err) {
+        try {
+          const mine = await workflowService.getMyBatches();
+          if (mounted) setBatchOptions(mine.map((r: any) => ({ id: r.id, batch_code: r.batch_code })));
+        } catch (err2) {
+          // ignore - leave options empty
+        }
+      }
+    };
+
+        const newDefect: DefectItem = {
+          id: `MAN-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+  }, []);
 
   const addManualDefect = () => {
     const newDefect: DefectItem = {
@@ -204,13 +263,19 @@ const NewInspectionPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Batch Code *
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={inspectionData.batchCode}
                         onChange={(e) => setInspectionData(prev => ({ ...prev, batchCode: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        placeholder="Enter batch code (e.g., BAT-2025-0345)"
-                      />
+                      >
+                        <option value="">Select batch</option>
+                        {batchOptions.map(b => (
+                          <option key={b.id} value={b.batch_code}>{b.batch_code}</option>
+                        ))}
+                      </select>
+                      {batchOptions.length === 0 && (
+                        <p className="text-xs text-gray-500 mt-1">Loading batches or none available.</p>
+                      )}
                     </div>
 
                     <div>
